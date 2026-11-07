@@ -1,15 +1,16 @@
+
 <!DOCTYPE html>
 <html lang="km">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Khmer AI Translator</title>
 <style>
 body {
-  font-family: Arial,sans-serif;
+  font-family: Arial, sans-serif;
   background: #101827;
   color: white;
-  padding: 20px;
+  padding: 15px;
 }
 .container {
   max-width: 500px;
@@ -18,58 +19,113 @@ body {
   padding: 20px;
   border-radius: 15px;
 }
-h2 {text-align:center;color:#38bdf8;}
-input,button {
+h2 {text-align:center;color:#38bdf8}
+label {display:block;margin-top:15px}
+textarea,input,button {
   width:100%;
-  padding:14px;
-  margin:12px 0;
-  border-radius:8px;
   box-sizing:border-box;
-}
-button {
-  background:#0ea5e9;
-  color:white;
+  padding:12px;
+  margin-top:8px;
+  border-radius:8px;
   border:0;
-  font-size:17px;
+  font-size:16px;
 }
-video {width:100%;margin-top:10px;}
+textarea {height:110px}
+button {
+  background:#0284c7;
+  color:white;
+  font-weight:bold;
+  margin-top:15px;
+}
+video {width:100%;margin-top:15px;border-radius:10px}
+.note {color:#fbbf24;font-size:13px}
 </style>
 </head>
 <body>
 <div class="container">
 <h2>🇰🇭 Khmer AI Translator</h2>
-<p>បកប្រែវីដេអូភាសាចិនទៅជាភាសាខ្មែរ</p>
+<p style="text-align:center">បកប្រែវីដេអូជាភាសាខ្មែរ</p>
 
-<label>ជ្រើសរើសវីដេអូ</label>
-<input type="file" id="video" accept="video/*">
+<label>📁 ជ្រើសរើសវីដេអូ</label>
+<input type="file" id="videoFile" accept="video/*">
 
-<video id="preview" controls hidden></video>
+<video id="player" controls hidden></video>
 
-<p>ភាសាដើម៖ Chinese 🇨🇳</p>
-<p>ភាសាបកប្រែ៖ Khmer 🇰🇭</p>
+<label>🇨🇳 អត្ថបទដើម (ភាសាចិន)</label>
+<textarea id="chinese" placeholder="បញ្ចូលអត្ថបទចិននៅទីនេះ..."></textarea>
 
-<button onclick="alert('ជំហានបន្ទាប់៖ តភ្ជាប់ AI Translation API')">
-ចាប់ផ្ដើមបកប្រែ
-</button>
+<label>🇰🇭 អត្ថបទបកប្រែ (ភាសាខ្មែរ)</label>
+<textarea id="khmer" placeholder="បញ្ចូលអត្ថបទខ្មែរនៅទីនេះ..."></textarea>
 
-<button onclick="alert('មុខងារ SRT នឹងតភ្ជាប់នៅជំហានបន្ទាប់')">
-បង្កើតឯកសារ SRT
-</button>
+<label>⏱ រយៈពេលក្នុងមួយចំណងជើង (វិនាទី)</label>
+<input type="number" id="duration" value="5" min="1">
 
-<button onclick="alert('មុខងារសំឡេងខ្មែរ នឹងតភ្ជាប់នៅជំហានបន្ទាប់')">
-បង្កើតសំឡេងខ្មែរ 🔊
-</button>
+<button onclick="makeSRT()">📥 បង្កើតឯកសារ Khmer SRT</button>
+
+<p id="status" class="note"></p>
+
+<hr>
+<p style="text-align:center">Khmer AI Translator 🇰🇭</p>
 </div>
 
 <script>
-document.getElementById('video').onchange = function(e) {
- const file = e.target.files[0];
- if(file) {
-  const player = document.getElementById('preview');
-  player.src = URL.createObjectURL(file);
-  player.hidden = false;
- }
-};
+const fileInput = document.getElementById("videoFile");
+const player = document.getElementById("player");
+
+fileInput.addEventListener("change", function() {
+  if(this.files[0]) {
+    player.src = URL.createObjectURL(this.files[0]);
+    player.hidden = false;
+  }
+});
+
+function timestamp(seconds) {
+  let h = Math.floor(seconds / 3600);
+  let m = Math.floor((seconds % 3600) / 60);
+  let s = Math.floor(seconds % 60);
+  return String(h).padStart(2,'0') + ":" +
+         String(m).padStart(2,'0') + ":" +
+         String(s).padStart(2,'0') + ",000";
+}
+
+function makeSRT() {
+  const text = document.getElementById("khmer").value.trim();
+  const duration = Number(document.getElementById("duration").value);
+
+  if(!text) {
+    alert("សូមបញ្ចូលអត្ថបទភាសាខ្មែរ!");
+    return;
+  }
+
+  if(!Number.isFinite(duration) || duration < 1) {
+    alert("សូមបញ្ចូលរយៈពេលឱ្យបានត្រឹមត្រូវ!");
+    return;
+  }
+
+  const lines = text.split(/\r?\n/).filter(x => x.trim());
+  let srt = "";
+
+  lines.forEach((line, i) => {
+    srt += (i + 1) + "\n";
+    srt += timestamp(i * duration) + " --> ";
+    srt += timestamp((i + 1) * duration) + "\n";
+    srt += line.trim() + "\n\n";
+  });
+
+  const blob = new Blob(["\uFEFF" + srt], {
+    type: "text/plain;charset=utf-8"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Khmer-Subtitles.srt";
+  a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById("status").textContent =
+    "បានបង្កើតឯកសារ SRT រួចរាល់!";
+}
 </script>
 </body>
 </html>
