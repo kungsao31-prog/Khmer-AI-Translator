@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Khmer AI Translator</title>
+<style>
+body {
+  font-family: Arial,sans-serif;
+  background: #101827;
+  color: white;
+  padding: 20px;
+}
+.container {
+  max-width: 500px;
+  margin: auto;
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 15px;
+}
+h2 {text-align:center;color:#38bdf8;}
+input,button {
+  width:100%;
+  padding:14px;
+  margin:12px 0;
+  border-radius:8px;
+  box-sizing:border-box;
+}
+button {
+  background:#0ea5e9;
+  color:white;
+  border:0;
+  font-size:17px;
+}
+video {width:100%;margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>🇰🇭 Khmer AI Translator</h2>
+<p>បកប្រែវីដេអូភាសាចិនទៅជាភាសាខ្មែរ</p>
+
+<label>ជ្រើសរើសវីដេអូ</label>
+<input type="file" id="video" accept="video/*">
+
+<video id="preview" controls hidden></video>
+
+<p>ភាសាដើម៖ Chinese 🇨🇳</p>
+<p>ភាសាបកប្រែ៖ Khmer 🇰🇭</p>
+
+<button onclick="alert('ជំហានបន្ទាប់៖ តភ្ជាប់ AI Translation API')">
+ចាប់ផ្ដើមបកប្រែ
+</button>
+
+<button onclick="alert('មុខងារ SRT នឹងតភ្ជាប់នៅជំហានបន្ទាប់')">
+បង្កើតឯកសារ SRT
+</button>
+
+<button onclick="alert('មុខងារសំឡេងខ្មែរ នឹងតភ្ជាប់នៅជំហានបន្ទាប់')">
+បង្កើតសំឡេងខ្មែរ 🔊
+</button>
+</div>
+
+<script>
+document.getElementById('video').onchange = function(e) {
+ const file = e.target.files[0];
+ if(file) {
+  const player = document.getElementById('preview');
+  player.src = URL.createObjectURL(file);
+  player.hidden = false;
+ }
+};
+</script>
+</body>
+</html>
