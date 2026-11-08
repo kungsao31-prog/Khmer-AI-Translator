@@ -1,3 +1,4 @@
+
 {
   "name": "khmer-ai-translator-pro",
   "version": "1.0.0",
@@ -5,13 +6,18 @@
   "description": "Khmer video subtitle and translation app",
   "scripts": {
     "web": "npx serve .",
+    "start": "node server.js",
     "android:add": "npx cap add android",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
-    "@capacitor/core": "^7.4.3"
+    "@capacitor/core": "^7.4.3",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.2",
+    "dotenv": "^16.4.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
