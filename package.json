@@ -1,18 +1,20 @@
-
 {
-  "name": "khmer-ai-translator-backend",
+  "name": "khmer-ai-translator-pro",
   "version": "1.0.0",
   "private": true,
-  "description": "Backend API for Khmer AI Translator Pro",
-  "main": "backend/server.js",
+  "description": "Khmer AI Translator Pro web frontend and Android build",
   "scripts": {
+    "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('WWW/index.html')) { console.error('ERROR: WWW/index.html not found. Keep the WWW folder in the project root.'); process.exit(1); } fs.rmSync('dist',{recursive:true,force:true}); fs.cpSync('WWW','dist',{recursive:true}); console.log('SUCCESS: WWW copied to dist');\"",
     "start": "node backend/server.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "express": "^4.21.2",
     "cors": "^2.8.5",
-    "multer": "^2.0.2",
     "dotenv": "^16.4.7",
-    "ffmpeg-static": "^5.2.0"
+    "express": "^4.21.2",
+    "ffmpeg-static": "^5.2.0",
+    "multer": "^1.4.5-lts.1"
   }
 }
