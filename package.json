@@ -1,16 +1,61 @@
 
-{
-  "name": "khmer-ai-translator",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Khmer AI Translator Pro",
-  "scripts": {
-    "start": "node backend/server.js"
-  },
-  "dependencies": {
-    "@capacitor/core": "^6.2.0"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.2.0"
-  }
-}
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check web application
+        run: |
+          test -f www/index.html
+
+      - name: Create Android project
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Khmer-Al-Translator-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
