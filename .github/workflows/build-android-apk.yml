@@ -1,11 +1,14 @@
 
-name: Build Khmer AI Translator APK
+name: Build Android APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -27,31 +30,32 @@ jobs:
           java-version: 17
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install dependencies
         run: npm install
 
-      - name: Accept Android SDK licenses
-        run: |
-          yes | sdkmanager --licenses
+      - name: Build web application
+        run: npm run build
 
       - name: Create Android project
-        run: npx cap add android
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
 
-      - name: Sync web app into Android
+      - name: Sync Android project
         run: npx cap sync android
 
-      - name: Build debug APK
-        working-directory: android
+      - name: Build Android APK
         run: |
-          chmod +x ./gradlew
+          cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Khmer-AI-Translator-debug-apk
+          name: Khmer-Al-Translator-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          
