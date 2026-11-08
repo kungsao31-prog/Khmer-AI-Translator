@@ -1,7 +1,7 @@
 {
   "appId": "com.khmeraitranslator.pro",
   "appName": "Khmer AI Translator Pro",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   }
