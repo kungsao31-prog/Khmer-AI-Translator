@@ -311,49 +311,73 @@ app.post("/api/tts", requireKey, async (req, res) => {
     }
     if (text.length > 4000) {
       return res.status(413).json({
-        error: "អត្ថបទវែងពេកសម្រាប់បង្កើតសំឡេងម្ដង។ សូមបែងចែកជាផ្នែក"
+        error: "អត្ថបទវែងពេក សូមបែងចែកជាផ្នែក"
       });
     }
 
     const voice = gender === "male" ? "Charon" : "Kore";
-    const data = await geminiGenerate(TTS_MODEL, {
-      contents: [{
-        parts: [{
-          text:
-            "Read the following Khmer text aloud in natural Cambodian Khmer. " +
-            "Use a " + gender + " speaking style, clear pronunciation, " +
-            "steady pace, and natural emotion. Do not translate or add words.\n\n" +
-            text
-        }]
-      }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voice }
-          }
+    const url =
+      "https://generativelanguage.googleapis.com/v1beta/interactions?key=" +
+      encodeURIComponent(API_KEY);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Api-Revision": "2026-05-20"
+      },
+      body: JSON.stringify({
+        model: TTS_MODEL,
+        input: [{
+          type: "user_input",
+          content: [{
+            type: "text",
+            text: text,
+            annotations: [{
+              type: "speech_metadata",
+              speaker: "Narrator",
+              style: gender === "male"
+                ? "natural Cambodian Khmer male voice, clear and warm"
+                : "natural Cambodian Khmer female voice, clear and warm"
+            }]
+          }]
+        }],
+        response_format: { type: "audio" },
+        generation_config: {
+          speech_config: [{
+            speaker: "Narrator",
+            voice: voice
+          }]
         }
-      }
+      })
     });
 
-    const audioPart = (
-      data.candidates?.[0]?.content?.parts || []
-    ).find(p => p.inlineData?.data);
-
-    if (!audioPart) {
-      throw new Error("AI មិនបានបង្កើតទិន្នន័យសំឡេងទេ");
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        data.error?.message || "Gemini TTS request failed"
+      );
     }
 
-    const audio = Buffer.from(audioPart.inlineData.data, "base64");
-    const mime = audioPart.inlineData.mimeType || "";
-    const wav = mime.includes("wav") ? audio : makeWav(audio);
+    let audioData = null;
+    for (const step of (data.steps || [])) {
+      for (const part of (step.content || [])) {
+        if (part.type === "audio" && part.data) {
+          audioData = part.data;
+        }
+      }
+    }
+    if (!audioData) {
+      throw new Error("AI មិនបានផ្ដល់ឯកសារសំឡេងទេ");
+    }
 
+    const audio = Buffer.from(audioData, "base64");
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="khmer-voice.wav"'
     );
-    res.send(wav);
+    res.send(audio);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
