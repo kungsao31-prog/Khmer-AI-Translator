@@ -34,8 +34,7 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: |
-          set +o pipefail
-          yes | sdkmanager --licenses || true
+          yes | sdkmanager --licenses
 
       - name: Create Android project
         run: npx cap add android
@@ -56,4 +55,3 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-          
