@@ -1,131 +1,45 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="km">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Khmer AI Translator</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071426"><title>Khmer AI Translator Pro</title>
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #101827;
-  color: white;
-  padding: 15px;
-}
-.container {
-  max-width: 500px;
-  margin: auto;
-  background: #1e293b;
-  padding: 20px;
-  border-radius: 15px;
-}
-h2 {text-align:center;color:#38bdf8}
-label {display:block;margin-top:15px}
-textarea,input,button {
-  width:100%;
-  box-sizing:border-box;
-  padding:12px;
-  margin-top:8px;
-  border-radius:8px;
-  border:0;
-  font-size:16px;
-}
-textarea {height:110px}
-button {
-  background:#0284c7;
-  color:white;
-  font-weight:bold;
-  margin-top:15px;
-}
-video {width:100%;margin-top:15px;border-radius:10px}
-.note {color:#fbbf24;font-size:13px}
-</style>
-</head>
-<body>
-<div class="container">
-<h2>🇰🇭 Khmer AI Translator</h2>
-<p style="text-align:center">បកប្រែវីដេអូជាភាសាខ្មែរ</p>
-
-<label>📁 ជ្រើសរើសវីដេអូ</label>
-<input type="file" id="videoFile" accept="video/*">
-
-<video id="player" controls hidden></video>
-
-<label>🇨🇳 អត្ថបទដើម (ភាសាចិន)</label>
-<textarea id="chinese" placeholder="បញ្ចូលអត្ថបទចិននៅទីនេះ..."></textarea>
-
-<label>🇰🇭 អត្ថបទបកប្រែ (ភាសាខ្មែរ)</label>
-<textarea id="khmer" placeholder="បញ្ចូលអត្ថបទខ្មែរនៅទីនេះ..."></textarea>
-
-<label>⏱ រយៈពេលក្នុងមួយចំណងជើង (វិនាទី)</label>
-<input type="number" id="duration" value="5" min="1">
-
-<button onclick="makeSRT()">📥 បង្កើតឯកសារ Khmer SRT</button>
-
-<p id="status" class="note"></p>
-
-<hr>
-<p style="text-align:center">Khmer AI Translator 🇰🇭</p>
-</div>
-
+:root{color-scheme:dark;--bg:#071426;--panel:#10233b;--line:#29435f;--cyan:#38bdf8;--text:#f3f8ff;--muted:#a9bdd2;--gold:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#071426,#0c1c31 55%,#071426);color:var(--text);font:16px/1.55 system-ui,"Noto Sans Khmer",Arial,sans-serif;padding:16px 14px 40px}main{max-width:760px;margin:auto}
+header{display:flex;align-items:center;gap:12px;margin:8px 0 18px}.logo{width:48px;height:48px;border-radius:15px;background:#12395a;display:grid;place-items:center;font-size:25px}h1{font-size:21px;margin:0}header p,.hint{color:var(--muted);font-size:13px;margin:3px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:13px 0}.card h2{font-size:17px;margin:0 0 12px;color:var(--cyan)}
+label{display:block;font-size:14px;margin:12px 0 6px}input,select,textarea{width:100%;border:1px solid #35516e;background:#091a2d;color:var(--text);border-radius:11px;padding:12px;font:inherit}textarea{min-height:110px;resize:vertical}
+button{border:0;border-radius:12px;padding:12px;background:#087fb7;color:white;font:inherit;font-weight:700;cursor:pointer;width:100%;margin-top:10px}.secondary{background:#203d5c;border:1px solid #3a5b7b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.video{position:relative;background:#020914;border-radius:13px;overflow:hidden;margin-top:12px}video{width:100%;display:block;max-height:420px}.caption{position:absolute;left:5%;right:5%;bottom:12%;text-align:center;font-size:24px;font-weight:800;color:white;text-shadow:0 2px 4px #000;background:#0009;padding:7px;border-radius:8px;pointer-events:none}
+.status{padding:10px;background:#091a2d;border:1px solid var(--line);border-radius:10px;color:var(--gold);font-size:13px;margin-top:12px;white-space:pre-wrap}.check{display:flex;gap:9px;align-items:center;color:var(--muted);font-size:13px}.check input{width:auto}.footer{text-align:center;color:var(--muted);font-size:12px;margin:22px 0}
+@media(max-width:480px){.grid{grid-template-columns:1fr}.card{padding:13px}}
+</style></head>
+<body><main>
+<header><div class="logo">🇰🇭</div><div><h1>Khmer AI Translator Pro</h1><p>បកប្រែវីដេអូ និងសំឡេងមកជាភាសាខ្មែរ</p></div></header>
+<section class="card"><h2>① ជ្រើសរើសវីដេអូ</h2><label for="videoFile">ឯកសារវីដេអូពីទូរស័ព្ទ</label><input id="videoFile" type="file" accept="video/*"><div class="video" id="videoWrap" hidden><video id="player" controls playsinline></video><div class="caption" id="caption"></div></div><p class="hint" id="videoInfo">ជ្រើសរើសវីដេអូ ដើម្បីចាក់មើល។</p></section>
+<section class="card"><h2>② ជ្រើសរើសភាសា</h2><div class="grid"><div><label>ភាសាដើម</label><select id="sourceLang"><option value="auto">ស្គាល់ភាសាដោយស្វ័យប្រវត្តិ</option><option value="zh">🇨🇳 ចិន</option><option value="th">🇹🇭 ថៃ</option><option value="en">🇬🇧 អង់គ្លេស</option><option value="vi">🇻🇳 វៀតណាម</option></select></div><div><label>ភាសាបកប្រែ</label><select disabled><option>🇰🇭 ខ្មែរ</option></select></div></div><p class="hint">ការស្គាល់សំឡេង និងបកប្រែដោយ AI ត្រូវការភ្ជាប់ម៉ាស៊ីនមេ API។</p></section>
+<section class="card"><h2>③ អត្ថបទដើម និងអត្ថបទខ្មែរ</h2><label>អត្ថបទដើមពីវីដេអូ</label><textarea id="sourceText" placeholder="ដាក់អត្ថបទចិន ថៃ អង់គ្លេស ឬវៀតណាម..."></textarea><label>អត្ថបទបកប្រែជាភាសាខ្មែរ</label><textarea id="khmerText" placeholder="ដាក់អត្ថបទខ្មែរនៅទីនេះ..."></textarea><div class="grid"><button id="translateBtn" class="secondary">✨ បកប្រែដោយ AI</button><button id="transcribeBtn" class="secondary">🎧 ស្គាល់សំឡេង</button></div><p class="hint">មុខងារទាំងពីរមិនទាន់ភ្ជាប់ AI API ទេ។</p></section>
+<section class="card"><h2>④ កំណត់ចំណងជើងរង</h2><div class="grid"><div><label>សំឡេងខ្មែរ</label><select id="voiceGender"><option value="female">សំឡេងស្រី</option><option value="male">សំឡេងប្រុស</option></select></div><div><label>ទំហំអក្សរ</label><select id="fontSize"><option value="18">តូច</option><option value="24" selected>មធ្យម</option><option value="30">ធំ</option></select></div></div><div class="grid"><div><label>ចាប់ផ្ដើម (វិនាទី)</label><input id="startAt" type="number" min="0" step=".1" value="0"></div><div><label>រយៈពេលក្នុងមួយបន្ទាត់ (វិនាទី)</label><input id="duration" type="number" min="1" step=".5" value="4"></div></div><label class="check"><input id="showCaption" type="checkbox" checked> បង្ហាញអក្សរខ្មែរលើវីដេអូ</label><label class="check"><input id="floatCaption" type="checkbox"> អក្សរអណ្តែតលើកម្មវិធីផ្សេង (ត្រូវការ APK និងសិទ្ធិ Overlay)</label><p class="hint">ពេលវេលាបច្ចុប្បន្នត្រូវបានកំណត់ស្មើៗគ្នា មិនទាន់ជាការសម្របសំឡេងដោយ AI ទេ។</p></section>
+<section class="card"><h2>⑤ សាកល្បងសំឡេង និងទាញយក</h2><button id="previewVoice" class="secondary">🔊 សាកល្បងអានអត្ថបទខ្មែរ</button><div class="grid"><button id="makeSrt">⬇️ ទាញយក Khmer SRT</button><button id="makeTxt" class="secondary">⬇️ ទាញយក TXT</button></div><button id="makeMp3" class="secondary">🎵 បង្កើត MP3</button><p class="hint">MP3 ជាសំឡេងខ្មែរត្រូវការសេវា Text-to-Speech នៅម៉ាស៊ីនមេ។</p><div id="status" class="status" role="status">រួចរាល់។ ជ្រើសរើសវីដេអូ និងបញ្ចូលអត្ថបទ។</div></section>
+<section class="card"><h2>⑥ អក្សររត់អណ្តែត</h2><p class="hint">ការបង្ហាញលើ YouTube, Facebook ឬកម្មវិធីផ្សេងត្រូវការកូដ Android Native Overlay Service និងសិទ្ធិ Display over other apps។ HTML ធម្មតាមិនអាចធ្វើបានទេ។</p></section>
+<footer class="footer">Khmer AI Translator Pro · កំណែដំបូង · 🇰🇭</footer>
+</main>
 <script>
-const fileInput = document.getElementById("videoFile");
-const player = document.getElementById("player");
-
-fileInput.addEventListener("change", function() {
-  if(this.files[0]) {
-    player.src = URL.createObjectURL(this.files[0]);
-    player.hidden = false;
-  }
-});
-
-function timestamp(seconds) {
-  let h = Math.floor(seconds / 3600);
-  let m = Math.floor((seconds % 3600) / 60);
-  let s = Math.floor(seconds % 60);
-  return String(h).padStart(2,'0') + ":" +
-         String(m).padStart(2,'0') + ":" +
-         String(s).padStart(2,'0') + ",000";
-}
-
-function makeSRT() {
-  const text = document.getElementById("khmer").value.trim();
-  const duration = Number(document.getElementById("duration").value);
-
-  if(!text) {
-    alert("សូមបញ្ចូលអត្ថបទភាសាខ្មែរ!");
-    return;
-  }
-
-  if(!Number.isFinite(duration) || duration < 1) {
-    alert("សូមបញ្ចូលរយៈពេលឱ្យបានត្រឹមត្រូវ!");
-    return;
-  }
-
-  const lines = text.split(/\r?\n/).filter(x => x.trim());
-  let srt = "";
-
-  lines.forEach((line, i) => {
-    srt += (i + 1) + "\n";
-    srt += timestamp(i * duration) + " --> ";
-    srt += timestamp((i + 1) * duration) + "\n";
-    srt += line.trim() + "\n\n";
-  });
-
-  const blob = new Blob(["\uFEFF" + srt], {
-    type: "text/plain;charset=utf-8"
-  });
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "Khmer-Subtitles.srt";
-  a.click();
-  URL.revokeObjectURL(url);
-
-  document.getElementById("status").textContent =
-    "បានបង្កើតឯកសារ SRT រួចរាល់!";
-}
-</script>
-</body>
-</html>
+(()=>{const $=id=>document.getElementById(id),file=$("videoFile"),player=$("player"),caption=$("caption"),status=$("status");let objectUrl=null;
+const message=t=>status.textContent=t;
+const lines=()=>$("khmerText").value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+const time=s=>{let n=Math.max(0,Math.round(s*1000)),h=Math.floor(n/3600000),m=Math.floor(n%3600000/60000),q=Math.floor(n%60000/1000),ms=n%1000;return [h,m,q].map(v=>String(v).padStart(2,"0")).join(":")+","+String(ms).padStart(3,"0")};
+const cues=()=>{let d=Math.max(1,Number($("duration").value)||4),s=Math.max(0,Number($("startAt").value)||0);return lines().map((text,i)=>({text,start:s+i*d,end:s+(i+1)*d}))};
+const download=(data,name,type)=>{let u=URL.createObjectURL(new Blob([data],{type})),a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)};
+file.addEventListener("change",()=>{let f=file.files&&file.files[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);player.src=objectUrl;$("videoWrap").hidden=false;$("videoInfo").textContent=f.name+" · "+(f.size/1048576).toFixed(1)+" MB";message("បានបញ្ចូលវីដេអូរួចរាល់។")});
+player.addEventListener("timeupdate",()=>{let c=$("showCaption").checked?cues().find(x=>player.currentTime>=x.start&&player.currentTime<x.end):null;caption.textContent=c?c.text:""});
+$("fontSize").addEventListener("change",()=>caption.style.fontSize=$("fontSize").value+"px");
+$("makeSrt").addEventListener("click",()=>{let c=cues();if(!c.length)return message("សូមបញ្ចូលអត្ថបទខ្មែរជាមុន។");let out=c.map((x,i)=>(i+1)+"\n"+time(x.start)+" --> "+time(x.end)+"\n"+x.text).join("\n\n")+"\n";download("\uFEFF"+out,"Khmer-Subtitles.srt","text/plain;charset=utf-8");message("បានបង្កើត SRT ចំនួន "+c.length+" បន្ទាត់។")});
+$("makeTxt").addEventListener("click",()=>{if(!lines().length)return message("សូមបញ្ចូលអត្ថបទខ្មែរជាមុន។");download($("khmerText").value,"Khmer-Translation.txt","text/plain;charset=utf-8");message("បានទាញយក TXT។")});
+$("previewVoice").addEventListener("click",()=>{let t=$("khmerText").value.trim();if(!t)return message("សូមបញ្ចូលអត្ថបទខ្មែរជាមុន។");if(!("speechSynthesis"in window))return message("Browser មិនគាំទ្រការអានសំឡេងទេ។");speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang="km-KH";speechSynthesis.speak(u);message("សាកល្បងអានអត្ថបទ។ បើមិនឮសំឡេងខ្មែរ ទូរស័ព្ទអាចមិនមាន Khmer TTS voice។")});
+$("translateBtn").addEventListener("click",()=>message("AI Translation API មិនទាន់ភ្ជាប់ទេ។"));
+$("transcribeBtn").addEventListener("click",()=>message("Speech-to-Text API មិនទាន់ភ្ជាប់ទេ។"));
+$("makeMp3").addEventListener("click",()=>message("Khmer Text-to-Speech MP3 API មិនទាន់ភ្ជាប់ទេ។"));
+$("floatCaption").addEventListener("change",()=>{if($("floatCaption").checked)message("Overlay ត្រូវការបង្កើត Android APK និងស្នើសុំសិទ្ធិ Display over other apps។")});
+})();
+</script></body></html>
