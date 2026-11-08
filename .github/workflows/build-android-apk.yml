@@ -2,10 +2,10 @@
 name: Build Khmer AI Translator APK
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
