@@ -2,6 +2,11 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { spawn } = require("child_process");
+const ffmpegPath = require("ffmpeg-static");
 require("dotenv").config();
 
 const app = express();
@@ -9,13 +14,17 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }
-});
-
+const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.OPENAI_API_KEY;
 const API_URL = "https://api.openai.com/v1";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024,
+    files: 1
+  }
+});
 
 function authHeaders() {
   return {
@@ -53,9 +62,12 @@ async function translateText(text) {
           {
             role: "system",
             content:
-              "Translate the following dialogue into natural Khmer. Preserve the full meaning, names, emotions, laughter and story details. Return only the Khmer translation."
+              "Translate the dialogue into natural, accurate Khmer. Preserve the complete meaning, names, emotions, laughter, and story details. Do not summarize. Return only Khmer translation."
           },
-          { role: "user", content: text }
+          {
+            role: "user",
+            content: text
+          }
         ],
         temperature: 0.3
       })
@@ -65,119 +77,251 @@ async function translateText(text) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error?.message || "Translation failed");
+    throw new Error(
+      data.error?.message || "Khmer translation failed"
+    );
   }
 
   return data.choices[0].message.content.trim();
 }
 
+function extractAudio(input, output) {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) {
+      return reject(new Error("FFmpeg is not installed"));
+    }
+
+    const ffmpeg = spawn(ffmpegPath, [
+      "-y",
+      "-i", input,
+      "-vn",
+      "-ac", "1",
+      "-ar", "16000",
+      "-b:a", "48k",
+      output
+    ]);
+
+    let errorOutput = "";
+
+    ffmpeg.stderr.on("data", data => {
+      errorOutput += data.toString();
+    });
+
+    ffmpeg.on("error", reject);
+
+    ffmpeg.on("close", code => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(
+          new Error("Cannot extract audio: " + errorOutput.slice(-1000))
+        );
+      }
+    });
+  });
+}
+
+async function transcribeAudio(audioBuffer, filename) {
+  const form = new FormData();
+
+  form.append(
+    "file",
+    new Blob([audioBuffer], {
+      type: "audio/mpeg"
+    }),
+    filename
+  );
+
+  form.append("model", "whisper-1");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
+
+  const response = await fetch(
+    `${API_URL}/audio/transcriptions`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: form
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error?.message || "Audio transcription failed"
+    );
+  }
+
+  return data;
+}
+
+// Home
 app.get("/", (req, res) => {
   res.json({
-    status: "OK",
-    message: "Khmer AI Translator Backend is running"
+    success: true,
+    name: "Khmer AI Translator",
+    status: "Live",
+    features: [
+      "Video upload",
+      "Chinese audio transcription",
+      "Khmer translation",
+      "SRT subtitles",
+      "Khmer text to speech"
+    ]
   });
 });
 
+// Health check
 app.get("/api/health", (req, res) => {
-  res.json({ success: true });
+  res.json({
+    success: true,
+    status: "Server is running",
+    apiConfigured: Boolean(API_KEY)
+  });
 });
 
-// Transcribe audio and translate into Khmer SRT
-app.post("/api/process", upload.single("audio"), async (req, res) => {
-  try {
-    if (!API_KEY) {
-      return res.status(500).json({
-        error: "OPENAI_API_KEY is missing"
-      });
-    }
+// Translate video or audio into Khmer SRT
+app.post(
+  "/api/process",
+  upload.fields([
+    { name: "video", maxCount: 1 },
+    { name: "audio", maxCount: 1 }
+  ]),
+  async (req, res) => {
+    let folder;
 
-    if (!req.file) {
-      return res.status(400).json({
-        error: "Please upload an audio file using field name audio"
-      });
-    }
-
-    const form = new FormData();
-
-    const audioBlob = new Blob(
-      [req.file.buffer],
-      { type: req.file.mimetype || "audio/mpeg" }
-    );
-
-    form.append("file", audioBlob, req.file.originalname);
-    form.append("model", "whisper-1");
-    form.append("response_format", "verbose_json");
-    form.append("timestamp_granularities[]", "segment");
-
-    const transcription = await fetch(
-      `${API_URL}/audio/transcriptions`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-        body: form
+    try {
+      if (!API_KEY) {
+        throw new Error("OPENAI_API_KEY is missing");
       }
-    );
 
-    const transcript = await transcription.json();
+      const video = req.files?.video?.[0];
+      const audio = req.files?.audio?.[0];
 
-    if (!transcription.ok) {
-      throw new Error(
-        transcript.error?.message || "Transcription failed"
+      if (!video && !audio) {
+        return res.status(400).json({
+          success: false,
+          error: "Please upload video using field video or audio using field audio"
+        });
+      }
+
+      folder = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), "khmer-translator-")
       );
-    }
 
-    const segments = transcript.segments || [];
-    const translatedSegments = [];
+      let audioBuffer;
+      let audioName;
 
-    for (const segment of segments) {
-      const khmer = await translateText(segment.text);
+      if (video) {
+        const input = path.join(folder, "input.mp4");
+        const output = path.join(folder, "audio.mp3");
 
-      translatedSegments.push({
-        start: segment.start,
-        end: segment.end,
-        text: khmer
+        await fs.promises.writeFile(input, video.buffer);
+
+        await extractAudio(input, output);
+
+        audioBuffer = await fs.promises.readFile(output);
+        audioName = "audio.mp3";
+      } else {
+        audioBuffer = audio.buffer;
+        audioName = "audio.mp3";
+      }
+
+      // OpenAI transcription upload limit
+      if (audioBuffer.length > 25 * 1024 * 1024) {
+        throw new Error(
+          "Audio is larger than 25MB. Please use a shorter video."
+        );
+      }
+
+      const transcript = await transcribeAudio(
+        audioBuffer,
+        audioName
+      );
+
+      const segments = transcript.segments || [];
+
+      if (!segments.length) {
+        throw new Error(
+          "No speech segments found in this video"
+        );
+      }
+
+      const translatedSegments = [];
+
+      for (const segment of segments) {
+        if (!segment.text?.trim()) continue;
+
+        const khmer = await translateText(segment.text);
+
+        translatedSegments.push({
+          start: segment.start,
+          end: segment.end,
+          text: khmer
+        });
+      }
+
+      const srt = translatedSegments
+        .map((item, index) => {
+          return [
+            index + 1,
+            `${toSrtTime(item.start)} --> ${toSrtTime(item.end)}`,
+            item.text
+          ].join("\n");
+        })
+        .join("\n\n");
+
+      res.json({
+        success: true,
+        message: "Video translated successfully",
+        originalText: transcript.text,
+        khmerText: translatedSegments
+          .map(item => item.text)
+          .join(" "),
+        srt: srt,
+        segments: translatedSegments
       });
+
+    } catch (error) {
+      console.error("PROCESS ERROR:", error);
+
+      res.status(500).json({
+        success: false,
+        error: error.message || "Video processing failed"
+      });
+
+    } finally {
+      if (folder) {
+        await fs.promises.rm(folder, {
+          recursive: true,
+          force: true
+        }).catch(console.error);
+      }
     }
-
-    const srt = translatedSegments.map((item, index) => {
-      return [
-        index + 1,
-        `${toSrtTime(item.start)} --> ${toSrtTime(item.end)}`,
-        item.text
-      ].join("\n");
-    }).join("\n\n");
-
-    res.json({
-      success: true,
-      originalText: transcript.text,
-      khmerText: translatedSegments
-        .map(item => item.text).join(" "),
-      srt: srt,
-      segments: translatedSegments
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
-});
+);
 
-// Generate Khmer speech
+// Generate Khmer voice
 app.post("/api/tts", async (req, res) => {
   try {
     if (!API_KEY) {
-      return res.status(500).json({
-        error: "OPENAI_API_KEY is missing"
-      });
+      throw new Error("OPENAI_API_KEY is missing");
     }
 
     const { text, voice = "nova" } = req.body;
 
-    if (!text) {
+    if (!text || typeof text !== "string") {
       return res.status(400).json({
+        success: false,
         error: "Please provide text"
+      });
+    }
+
+    if (text.length > 4000) {
+      return res.status(400).json({
+        success: false,
+        error: "Text is too long. Please split it into smaller parts."
       });
     }
 
@@ -191,7 +335,7 @@ app.post("/api/tts", async (req, res) => {
         },
         body: JSON.stringify({
           model: "tts-1",
-          voice: voice,
+          voice,
           input: text,
           response_format: "mp3"
         })
@@ -199,16 +343,24 @@ app.post("/api/tts", async (req, res) => {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || "Voice generation failed");
+      const data = await response.json();
+
+      throw new Error(
+        data.error?.message || "Voice generation failed"
+      );
     }
 
-    const audio = Buffer.from(await response.arrayBuffer());
+    const audio = Buffer.from(
+      await response.arrayBuffer()
+    );
 
     res.set("Content-Type", "audio/mpeg");
+    res.set("Content-Disposition", "attachment; filename=khmer-voice.mp3");
     res.send(audio);
 
   } catch (error) {
+    console.error("TTS ERROR:", error);
+
     res.status(500).json({
       success: false,
       error: error.message
@@ -216,9 +368,9 @@ app.post("/api/tts", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-
+// Start server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Khmer Translator Backend running on port ${PORT}`);
+  console.log(
+    `Khmer AI Translator running on port ${PORT}`
+  );
 });
-    
