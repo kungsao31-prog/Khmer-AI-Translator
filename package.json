@@ -4,7 +4,8 @@
   "private": true,
   "description": "Khmer AI Translator Pro",
   "scripts": {
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('www/index.html')) throw new Error('Missing www/index.html'); console.log('Web application ready for Android build');\""
   },
   "dependencies": {
     "@capacitor/core": "^6.2.0",
