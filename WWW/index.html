@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Khmer AI Translator</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #071426;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+textarea {
+  width: 95%;
+  height: 130px;
+  margin: 15px 0;
+  border-radius: 10px;
+  padding: 10px;
+}
+button {
+  padding: 14px;
+  margin: 5px;
+  border: 0;
+  border-radius: 10px;
+  background: #00aaff;
+  color: white;
+}
+</style>
+</head>
+<body>
+<h2>🎬 Khmer AI Translator Pro</h2>
+<textarea id="source" placeholder="បញ្ចូលអត្ថបទនៅទីនេះ"></textarea>
+<br>
+<button onclick="translateText()">បកប្រែជាខ្មែរ</button>
+<button onclick="speakText()">🔊 ស្តាប់សំឡេង</button>
+<textarea id="result" placeholder="លទ្ធផលភាសាខ្មែរ"></textarea>
+<script>
+const API = "YOUR_BACKEND_URL";
+
+async function translateText() {
+  const text = document.getElementById("source").value;
+  if (!text.trim()) return alert("សូមបញ្ចូលអត្ថបទ");
+
+  try {
+    const r = await fetch(API + "/api/translate", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({text})
+    });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error(d.error);
+    document.getElementById("result").value = d.khmerText;
+  } catch(e) {
+    alert("បកប្រែមិនបាន: " + e.message);
+  }
+}
+
+function speakText() {
+  const text = document.getElementById("result").value;
+  if (!text) return alert("គ្មានអត្ថបទសម្រាប់អាន");
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "km-KH";
+  speechSynthesis.speak(u);
+}
+</script>
+</body>
+</html>
