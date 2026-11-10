@@ -4,6 +4,12 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { randomUUID } = require("crypto");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
+const ffmpegPath = require("ffmpeg-static");
+const { EdgeTTS } = require("node-edge-tts");
+const execFileAsync = promisify(execFile);
 require("dotenv").config();
 
 const app = express();
@@ -61,59 +67,109 @@ async function deleteGeminiFile(name) {
   if (!name) return;
   try { await fetch("https://generativelanguage.googleapis.com/v1beta/"+name,{method:"DELETE",headers:{"x-goog-api-key":API_KEY}}); } catch (_) {}
 }
-function makeWav(pcm, sampleRate=24000, channels=1) {
-  const header=Buffer.alloc(44), size=pcm.length;
-  header.write("RIFF",0);header.writeUInt32LE(36+size,4);header.write("WAVE",8);header.write("fmt ",12);header.writeUInt32LE(16,16);header.writeUInt16LE(1,20);header.writeUInt16LE(channels,22);header.writeUInt32LE(sampleRate,24);header.writeUInt32LE(sampleRate*channels*2,28);header.writeUInt16LE(channels*2,32);header.writeUInt16LE(16,34);header.write("data",36);header.writeUInt32LE(size,40);
-  return Buffer.concat([header,pcm]);
+function validateVoice(gender) {
+  return gender === "male" || gender === "km-KH-PisethNeural"
+    ? "km-KH-PisethNeural"
+    : "km-KH-SreymomNeural";
 }
-app.get("/",(req,res)=>res.json({service:"Khmer AI Translator Pro Backend",status:"online"}));
-app.get("/api/health",(req,res)=>res.json({ok:true,service:"Khmer AI Translator Pro",aiConfigured:Boolean(API_KEY)}));
-
-app.post("/api/translate",requireKey,async(req,res)=>{
+async function synthesizeKhmer(text, gender, output) {
+  const voice = validateVoice(gender);
+  const tts = new EdgeTTS({ voice, lang: "km-KH", outputFormat: "audio-24khz-48kbitrate-mono-mp3", timeout: 30000 });
+  await tts.ttsPromise(text, output);
+  const stat = await fs.promises.stat(output);
+  if (!stat.size) throw new Error("សេវាសំឡេងខ្មែរបានបង្កើតឯកសារទទេ");
+}
+async function runFfmpeg(args) {
+  return execFileAsync(ffmpegPath, args, { maxBuffer: 20 * 1024 * 1024, timeout: 30 * 60 * 1000 });
+}
+async function videoDuration(file) {
+  let output = "";
   try {
-    const sourceText=String(req.body.sourceText||req.body.text||"").trim();
-    const sourceLang=String(req.body.sourceLang||"auto");
-    if(!sourceText)return res.status(400).json({error:"សូមបញ្ចូលអត្ថបទដើម"});
-    if(sourceText.length>30000)return res.status(413).json({error:"អត្ថបទវែងពេក សូមបែងចែកជាផ្នែក"});
-    const data=await geminiGenerate(TEXT_MODEL,{contents:[{role:"user",parts:[{text:"អ្នកជាអ្នកបកប្រែជំនាញ។ បកប្រែអត្ថបទពី "+sourceLang+" ទៅជាភាសាខ្មែរធម្មជាតិ ត្រឹមត្រូវ និងរក្សាន័យដើម។ រក្សាឈ្មោះ លេខ និងលំដាប់សន្ទនា។ បញ្ចេញតែអត្ថបទខ្មែរ។\n\n"+sourceText}]}],generationConfig:{temperature:0.2}});
-    const translatedText=getText(data);
-    if(!translatedText)throw new Error("Gemini មិនបានផ្ដល់លទ្ធផលបកប្រែ");
-    res.json({ok:true,success:true,originalText:sourceText,translatedText,khmerText:translatedText,targetLanguage:"Khmer"});
-  } catch(e) { res.status(502).json({error:e.message}); }
+    const result = await runFfmpeg(["-i", file, "-f", "null", "-"]);
+    output = (result.stdout || "") + "\\n" + (result.stderr || "");
+  } catch (error) {
+    output = (error.stdout || "") + "\\n" + (error.stderr || "");
+  }
+  const match = output.match(/Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)/);
+  if (!match) throw new Error("មិនអាចអានរយៈពេលវីដេអូបាន");
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+}
+
+app.post("/api/tts", requireKey, async (req, res) => {
+  const text = String(req.body.text || "").trim();
+  if (!text) return res.status(400).json({ error: "សូមបញ្ចូលអត្ថបទខ្មែរ" });
+  if (text.length > 5000) return res.status(413).json({ error: "អត្ថបទវែងពេក (អតិបរមា 5000 តួអក្សរ)" });
+  const output = path.join(TMP, randomUUID() + ".mp3");
+  try {
+    await synthesizeKhmer(text, req.body.gender, output);
+    res.type("audio/mpeg");
+    res.setHeader("Content-Disposition", 'attachment; filename="khmer-voice.mp3"');
+    res.sendFile(output, error => {
+      fs.promises.unlink(output).catch(() => {});
+      if (error && !res.headersSent) res.status(500).end();
+    });
+  } catch (error) {
+    await fs.promises.unlink(output).catch(() => {});
+    res.status(502).json({ error: "បង្កើតសំឡេងខ្មែរមិនបាន៖ " + error.message });
+  }
 });
 
-app.post("/api/process-video",requireKey,upload.single("video"),async(req,res)=>{
-  let remoteFile;
+app.post("/api/dub", upload.single("video"), async (req, res) => {
+  const work = path.join(TMP, randomUUID());
+  await fs.promises.mkdir(work, { recursive: true });
+  const output = path.join(work, "khmer-dub.mp4");
+  const background = path.join(work, "background.wav");
   try {
-    if(!req.file)return res.status(400).json({error:"សូមជ្រើសរើសវីដេអូជាមុន"});
-    const sourceLang=String(req.body.sourceLang||"auto");
-    remoteFile=await uploadGeminiFile(req.file.path,req.file.mimetype||"video/mp4",req.file.originalname||"uploaded-video");
-    const prompt="Analyze the entire video from beginning to end. Listen to all spoken dialogue. Source language: "+sourceLang+". Translate every spoken segment into natural spoken Khmer. Return ONLY valid JSON: {\"segments\":[{\"start\":0.0,\"end\":2.5,\"source\":\"original words\",\"khmer\":\"Khmer translation\"}]}. Timestamps are seconds from the start. Do not invent dialogue or timestamps. Include all audible speech.";
-    const data=await geminiGenerate(TEXT_MODEL,{contents:[{role:"user",parts:[{fileData:{mimeType:remoteFile.mimeType||req.file.mimetype,fileUri:remoteFile.uri}},{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:0.2}});
-    const raw=getText(data).replace(/^\s*```(?:json)?/i,"").replace(/```\s*$/i,"").trim();
-    const parsed=JSON.parse(raw);
-    const segments=Array.isArray(parsed.segments)?parsed.segments.map((s,i)=>({id:i+1,start:Math.max(0,Number(s.start)||0),end:Math.max(Number(s.start)||0,Number(s.end)||((Number(s.start)||0)+2)),source:String(s.source||""),khmer:String(s.khmer||"")})).filter(s=>s.khmer):[];
-    if(!segments.length)throw new Error("Gemini មិនបានបង្កើតចំណងជើងរងទេ");
-    res.json({ok:true,segments,sourceText:segments.map(s=>s.source).join("\n"),khmerText:segments.map(s=>s.khmer).join("\n")});
-  } catch(e) { res.status(502).json({error:e.message}); }
-  finally { if(remoteFile?.name)await deleteGeminiFile(remoteFile.name); if(req.file?.path)try{fs.unlinkSync(req.file.path)}catch(_){} }
-});
-
-app.post("/api/tts",requireKey,async(req,res)=>{
-  try {
-    const text=String(req.body.text||"").trim(), gender=req.body.gender==="male"?"male":"female";
-    if(!text)return res.status(400).json({error:"សូមបញ្ចូលអត្ថបទខ្មែរ"});
-    if(text.length>4000)return res.status(413).json({error:"អត្ថបទវែងពេក សូមបែងចែកជាផ្នែក"});
-    const voice=gender==="male"?"Charon":"Kore";
-    const data=await geminiGenerate(TTS_MODEL,{contents:[{parts:[{text:"Read the following Khmer text aloud naturally and clearly.\n"+text}]}],generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}});
-    const part=(data.candidates?.[0]?.content?.parts||[]).find(p=>p.inlineData?.data);
-    if(!part)throw new Error("Gemini TTS មិនបានផ្ដល់ទិន្នន័យសំឡេង។ ពិនិត្យថា TTS model អាចប្រើបានសម្រាប់ API Key របស់អ្នកឬអត់។");
-    const pcm=Buffer.from(part.inlineData.data,"base64");
-    const mime=part.inlineData.mimeType||"audio/L16;rate=24000";
-    const rate=Number((mime.match(/rate=(\d+)/)||[])[1]||24000);
-    const wav=makeWav(pcm,rate,1);
-    res.setHeader("Content-Type","audio/wav");res.setHeader("Content-Disposition",'attachment; filename="khmer-voice.wav"');res.send(wav);
-  } catch(e) { res.status(502).json({error:e.message}); }
+    if (!req.file) return res.status(400).json({ error: "សូមជ្រើសរើសវីដេអូ" });
+    let segments;
+    try { segments = JSON.parse(req.body.segments || "[]"); }
+    catch { throw new Error("ទិន្នន័យចំណងជើងរងមិនត្រឹមត្រូវ"); }
+    if (!Array.isArray(segments) || !segments.length || segments.length > 150)
+      throw new Error("ចំនួនផ្នែកសំឡេងមិនត្រឹមត្រូវ (អតិបរមា 150 ផ្នែក)");
+    const duration = await videoDuration(req.file.path);
+    const valid = segments.map(item => ({
+      start: Math.max(0, Number(item.start) || 0),
+      end: Math.min(duration, Number(item.end) || 0),
+      translation: String(item.translation || item.khmer || "").trim()
+    })).filter(item => item.translation && item.end > item.start && item.start < duration);
+    if (!valid.length) throw new Error("គ្មានអត្ថបទខ្មែរសម្រាប់បញ្ចូលសំឡេង");
+    const voice = validateVoice(req.body.gender || req.body.voice);
+    const audioFiles = [];
+    for (let i = 0; i < valid.length; i++) {
+      const audioFile = path.join(work, "voice-" + i + ".mp3");
+      await synthesizeKhmer(valid[i].translation, voice, audioFile);
+      audioFiles.push(audioFile);
+    }
+    let hasBackground = true;
+    try {
+      await runFfmpeg(["-y", "-i", req.file.path, "-vn", "-ac", "2", "-ar", "44100", "-t", String(duration), background]);
+    } catch (_) { hasBackground = false; }
+    const args = ["-y", "-i", req.file.path];
+    if (hasBackground) args.push("-i", background);
+    else args.push("-f", "lavfi", "-t", String(duration), "-i", "anullsrc=channel_layout=stereo:sample_rate=44100");
+    for (const file of audioFiles) args.push("-i", file);
+    const filters = ["[1:a]volume=0.14,apad,atrim=duration=" + duration + "[bg]"];
+    const inputs = ["[bg]"];
+    valid.forEach((segment, index) => {
+      const label = "voice" + index;
+      const delay = Math.round(segment.start * 1000);
+      filters.push("[" + (index + 2) + ":a]adelay=" + delay + "|" + delay + ",volume=1.0[" + label + "]");
+      inputs.push("[" + label + "]");
+    });
+    filters.push(inputs.join("") + "amix=inputs=" + inputs.length + ":duration=first:dropout_transition=0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]");
+    args.push("-filter_complex", filters.join(";"), "-map", "0:v:0", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", String(duration), "-shortest", output);
+    await runFfmpeg(args);
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
+    res.sendFile(output, () => {
+      fs.promises.unlink(req.file.path).catch(() => {});
+      fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+    });
+  } catch (error) {
+    if (req.file?.path) await fs.promises.unlink(req.file.path).catch(() => {});
+    await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+    res.status(500).json({ error: "បង្កើតវីដេអូបញ្ចូលសំឡេងខ្មែរមិនបាន៖ " + error.message });
+  }
 });
 
 app.use((err,req,res,next)=>{
