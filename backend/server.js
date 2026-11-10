@@ -90,7 +90,7 @@ async function videoDuration(file) {
   } catch (error) {
     output = (error.stdout || "") + "\\n" + (error.stderr || "");
   }
-  const match = output.match(/Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)/);
+  const match = output.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (!match) throw new Error("មិនអាចអានរយៈពេលវីដេអូបាន");
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
