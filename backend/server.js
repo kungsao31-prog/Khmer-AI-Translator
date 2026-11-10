@@ -428,7 +428,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/api/health", (req, res) => {
+const healthHandler = (req, res) => {
   res.status(200).json({
     ok: true,
     status: "healthy",
@@ -437,7 +437,9 @@ app.get("/api/health", (req, res) => {
     geminiConfigured: Boolean(API_KEY),
     ffmpegConfigured: Boolean(ffmpegPath)
   });
-});
+};
+app.get("/api/health", healthHandler);
+app.get("/health", healthHandler);
 
 // Text translation
 app.post("/api/translate", requireGeminiKey, asyncRoute(async (req, res) => {
