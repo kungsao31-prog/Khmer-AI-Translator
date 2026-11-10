@@ -38,7 +38,7 @@ const app = express();
 
 const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.GEMINI_API_KEY || "";
-const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
+const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || TEXT_MODEL;
 const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 100));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
