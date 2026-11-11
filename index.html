@@ -24,15 +24,34 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .result-video{margin-top:12px}.result-video video{width:100%;border-radius:14px;background:#000}
 .hidden{display:none!important}.foot{text-align:center;color:#789d93;font-size:11px;padding:18px 4px}
 @media(max-width:650px){.app{grid-template-columns:62px minmax(0,1fr);gap:8px;padding:8px}.rail{border-radius:21px;padding:9px 4px;gap:9px}.brand{width:44px;height:44px;font-size:23px}.nav{width:49px;min-height:58px;border-radius:15px;font-size:19px}.nav small{font-size:9px}.panel{padding:13px;border-radius:19px}.top h1{font-size:17px}.top p{font-size:10px}.pill{padding:6px 8px;font-size:10px}.row{grid-template-columns:1fr;gap:0}.subtitle{font-size:18px}}
+
+/* Reference-inspired side console: charcoal panels, cyan outlines and numbered rail */
+.app{max-width:1180px;grid-template-columns:78px minmax(0,1fr);gap:14px;padding:14px}
+.rail{position:sticky;top:12px;height:calc(100dvh - 24px);min-height:540px;border-radius:28px;background:linear-gradient(180deg,#172322,#0b1718);border-color:#42605d;padding:13px 8px;gap:13px}
+.brand{border:1px solid #36d9cf;background:linear-gradient(145deg,#087d83,#123e4b)}
+.nav{width:60px;min-height:62px;border-radius:21px;border:1.5px solid #7ba5a1;background:linear-gradient(145deg,#1b292a,#101b1c);color:#bafaf0;font-size:23px;box-shadow:inset 0 0 0 1px #ffffff0a}
+.nav.active{background:linear-gradient(145deg,#16cdb5,#087f83);border-color:#31fff0;color:#fff;box-shadow:0 0 20px #00e7d455}
+.panel{border-radius:25px;border-color:#397b76;background:linear-gradient(150deg,#1b2929,#111b1d);box-shadow:0 18px 45px #0005}
+.panel h2{color:#65f6e1}
+.video-wrap{border:2px solid #23d9e4;box-shadow:0 0 18px #12dce333}
+.video-wrap video{max-height:56vh;object-fit:contain}
+.library-list{display:grid;gap:9px;margin-top:12px}
+.library-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #38635e;background:#0d1d1e;border-radius:15px}
+.library-item .meta{flex:1;min-width:0}
+.library-item strong{display:block;overflow-wrap:anywhere;font-size:13px}
+.library-item small{color:#9bbcb5;font-size:11px}
+.library-item button{border:1px solid #2a9e8b;border-radius:10px;background:#123d38;color:#dffff8;padding:7px 10px}
+@media(max-width:650px){.app{grid-template-columns:58px minmax(0,1fr);gap:7px;padding:7px}.rail{top:7px;height:calc(100dvh - 14px);min-height:500px;border-radius:20px;padding:9px 3px;gap:9px}.brand{width:44px;height:44px}.nav{width:49px;min-height:56px;border-radius:17px}.panel{padding:12px}.video-wrap video{max-height:48vh}.library-item{flex-wrap:wrap}.library-item .meta{min-width:65%}}
 </style>
 </head>
 <body>
 <div class="app">
 <aside class="rail" aria-label="ម៉ឺនុយកម្មវិធី">
   <div class="brand">🇰🇭</div>
-  <button class="nav active" data-panel="backend" aria-label="Backend">☷<small>01</small></button>
-  <button class="nav" data-panel="video" aria-label="បកប្រែវីដេអូ">▶<small>02</small></button>
-  <button class="nav" data-panel="text" aria-label="បកប្រែអត្ថបទ">文<small>03</small></button>
+  <button class="nav active" data-panel="backend" aria-label="Backend" title="ការភ្ជាប់ Backend">⚙️<small>01</small></button>
+  <button class="nav" data-panel="video" aria-label="បកប្រែវីដេអូ" title="បកប្រែវីដេអូ">🎬<small>02</small></button>
+  <button class="nav" data-panel="text" aria-label="បកប្រែអត្ថបទ" title="បកប្រែអត្ថបទ">✨<small>03</small></button>
+  <button class="nav" data-panel="files" aria-label="ឯកសាររបស់ខ្ញុំ" title="ឯកសាររបស់ខ្ញុំ">📁<small>04</small></button>
   <div class="spacer"></div>
   <button class="nav" id="homeNav" aria-label="ទំព័រដើម">⌂<small>Home</small></button>
 </aside>
@@ -79,6 +98,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   </div>
 </section>
 
+<section class="panel" id="panel-files">
+  <h2>④ ឯកសាររបស់ខ្ញុំ</h2>
+  <p class="sub">ឯកសារវីដេអូខ្មែរ SRT និង MP3 ដែលអ្នកបានរក្សាទុកក្នុងកម្មវិធីនេះ។ អ្នកអាចទាញយកម្តងទៀតទៅថត Downloads របស់ទូរសព្ទ។</p>
+  <div class="status">ឯកសារដែលរក្សាទុកនៅទីនេះស្ថិតក្នុងទំហំផ្ទុកកម្មវិធីលើទូរសព្ទនេះ។ សូមទាញយកទៅ Downloads ប្រសិនបើចង់រក្សាទុកជាឯកសារធម្មតាក្នុងទូរសព្ទ។</div>
+  <div id="libraryList" class="library-list"><div class="status">កំពុងពិនិត្យឯកសារ...</div></div>
+</section>
+
 <section class="panel" id="panel-text">
   <h2>③ បកប្រែអត្ថបទ</h2>
   <p class="sub">បញ្ចូលអត្ថបទចិន ថៃ អង់គ្លេស ឬភាសាផ្សេងៗ រួចបកប្រែ និងបង្កើតសំឡេងខ្មែរ។</p>
@@ -99,7 +125,15 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 (function(){
   const $=id=>document.getElementById(id);
   const DEFAULT_URL="https://khmer-ai-translator.onrender.com";
-  let originalUrl="",dubUrl="",audioUrl="",segments=[],timer=null,startedAt=0;
+  let originalUrl="",dubUrl="",audioUrl="",dubBlob=null,audioBlob=null,segments=[],timer=null,startedAt=0;
+  const LIB_DB="khmer-ai-translator-library",LIB_STORE="files";
+  function openLibrary(){return new Promise((resolve,reject)=>{if(!("indexedDB" in window)){reject(new Error("ទូរសព្ទមិនគាំទ្រកន្លែងរក្សាទុកក្នុងកម្មវិធី"));return}const req=indexedDB.open(LIB_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LIB_STORE))req.result.createObjectStore(LIB_STORE,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error("បើកកន្លែងរក្សាទុកមិនបាន"))})}
+  async function saveLibraryFile(name,blob,kind){try{const db=await openLibrary();await new Promise((resolve,reject)=>{const tx=db.transaction(LIB_STORE,"readwrite");tx.objectStore(LIB_STORE).put({id:Date.now()+"-"+Math.floor(Math.random()*1e6),name,blob,kind,createdAt:new Date().toISOString()});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();await renderLibrary();return true}catch(e){console.warn("Library save:",e);return false}}
+  async function readLibrary(){const db=await openLibrary();const rows=await new Promise((resolve,reject)=>{const req=db.transaction(LIB_STORE,"readonly").objectStore(LIB_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});db.close();return rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt))}
+  async function renderLibrary(){const host=$("libraryList");try{const rows=await readLibrary();host.innerHTML=rows.length?rows.map(f=>'<div class="library-item" data-id="'+escapeHtml(f.id)+'"><div class="meta"><strong>📄 '+escapeHtml(f.name)+'</strong><small>'+escapeHtml(f.kind)+' · '+new Date(f.createdAt).toLocaleString()+'</small></div><button data-action="download">ទាញយក</button><button data-action="delete">លុប</button></div>').join(""):'<div class="status">មិនទាន់មានឯកសាររក្សាទុកទេ។ បង្កើតវីដេអូ ឬសំឡេង រួចចុចទាញយក ដើម្បីរក្សាទុកនៅទីនេះ។</div>'}catch(e){host.innerHTML='<div class="status error">មិនអាចបើកបណ្ណាល័យឯកសារបាន៖ '+escapeHtml(e.message)+'</div>'}}
+  async function downloadLibraryItem(id){const rows=await readLibrary(),f=rows.find(x=>String(x.id)===String(id));if(f)downloadBlob(f.blob,f.name)}
+  async function deleteLibraryItem(id){const db=await openLibrary();await new Promise((resolve,reject)=>{const tx=db.transaction(LIB_STORE,"readwrite");tx.objectStore(LIB_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();await renderLibrary()}
+
   function base(){return String($("backendUrl").value||"").trim().replace(/\/+$/,"")}
   function setStatus(id,msg,kind){const el=$(id);el.textContent=msg;el.className="status"+(kind?" "+kind:"")}
   function fmt(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=Math.floor(sec%60);return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")}
@@ -110,7 +144,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   function stopTimer(){if(timer){clearInterval(timer);timer=null}}
   function setProgress(p,label,working){$("progressBar").style.width=Math.max(0,Math.min(100,p))+"%";$("progressLabel").textContent=label;$("progressTrack").classList.toggle("indeterminate",!!working)}
   function showPanel(name){document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+name));document.querySelectorAll(".nav[data-panel]").forEach(b=>b.classList.toggle("active",b.dataset.panel===name))}
-  document.querySelectorAll(".nav[data-panel]").forEach(b=>b.addEventListener("click",()=>showPanel(b.dataset.panel)));
+  document.querySelectorAll(".nav[data-panel]").forEach(b=>b.addEventListener("click",()=>{showPanel(b.dataset.panel);if(b.dataset.panel==="files")renderLibrary()}));
+  $("libraryList").addEventListener("click",async e=>{const b=e.target.closest("button[data-action]");if(!b)return;const item=b.closest(".library-item");if(!item)return;try{if(b.dataset.action==="download")await downloadLibraryItem(item.dataset.id);else if(b.dataset.action==="delete"&&confirm("លុបឯកសារនេះចេញពីកម្មវិធី?"))await deleteLibraryItem(item.dataset.id)}catch(err){alert(err.message)}});
   $("homeNav").addEventListener("click",()=>showPanel("backend"));
   $("backendUrl").value=localStorage.getItem("khmerBackendUrl")||DEFAULT_URL;
   async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល URL");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");const r=await fetch(u+"/api/health",{method:"GET"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Backend មិនឆ្លើយតប");$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
@@ -122,12 +157,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   function xhrUpload(path,form,onProgress){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl(path));x.responseType="json";x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};x.onload=()=>{let d=x.response;if(!d&&x.responseText){try{d=JSON.parse(x.responseText)}catch(_){}}if(x.status>=200&&x.status<300)resolve(d||{});else reject(new Error((d&&d.error)||("Server error "+x.status)))};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));x.onabort=()=>reject(new Error("បានបោះបង់ការផ្ទុក"));x.send(form)})}
   $("scanVideo").addEventListener("click",async()=>{const f=$("videoFile").files[0];if(!f){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}if(f.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}try{await ensureBackend();const form=new FormData();form.append("video",f);form.append("sourceLanguage",$("sourceLanguage").value);startTimer();setProgress(0,"កំពុងផ្ទុកវីដេអូ...",false);setStatus("videoStatus","កំពុងផ្ទុកវីដេអូទៅ Backend...");$("scanVideo").disabled=true;const d=await xhrUpload("/api/video/translate",form,p=>{setProgress(p,"កំពុងផ្ទុកវីដេអូ "+p+"%",false);setStatus("videoStatus","ផ្ទុកវីដេអូបាន "+p+"%។ បន្ទាប់មក AI នឹងស្កេនសំឡេង។")});setProgress(100,"កំពុងស្កេនសំឡេង និងបកប្រែដោយ AI...",true);setStatus("videoStatus","បានផ្ទុកវីដេអូរួច។ កំពុងស្កេនសំឡេង និងបកប្រែ។ សូមរង់ចាំ...");const result=d.segments||[];segments=result.map(s=>({start:Number(s.start)||0,end:Number(s.end)||0,original:s.original||s.source||"",translation:s.translation||s.khmer||""})).filter(s=>s.translation);if(!segments.length)throw new Error("AI មិនបានរកឃើញសំឡេងនិយាយ ឬមិនបានបង្កើតអត្ថបទខ្មែរ");$("segmentList").innerHTML=segments.map((s,i)=>'<div class="segment"><time>'+srtTime(s.start)+' → '+srtTime(s.end)+'</time><div>'+escapeHtml(s.translation)+'</div><div class="original">'+escapeHtml(s.original)+'</div></div>').join("");$("segmentsArea").classList.remove("hidden");$("dubResult").classList.add("hidden");setProgress(100,"ស្កេនរួចរាល់ · "+segments.length+" ផ្នែក",false);setStatus("videoStatus","បានស្គាល់សំឡេង និងបកប្រែរួចរាល់។ ចំនួន "+segments.length+" ផ្នែក។","good")}catch(e){setStatus("videoStatus","មានបញ្ហា៖ "+e.message,"error");setProgress(0,"ស្កេនមិនបាន",false)}finally{stopTimer();$("scanVideo").disabled=false}});
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-  $("downloadSrt").addEventListener("click",()=>{if(!segments.length)return;const content=segments.map((s,i)=>(i+1)+"\n"+srtTime(s.start)+" --> "+srtTime(s.end)+"\n"+s.translation).join("\n\n")+"\n";downloadBlob(new Blob(["\uFEFF"+content],{type:"text/plain;charset=utf-8"}),"Khmer-Subtitles.srt")});
-  $("createDub").addEventListener("click",async()=>{const f=$("videoFile").files[0];if(!f||!segments.length)return;try{await ensureBackend();const form=new FormData();form.append("video",f);form.append("segments",JSON.stringify(segments.map(s=>({start:s.start,end:s.end,translation:s.translation}))));form.append("gender",$("voiceGender").value);startTimer();setStatus("dubStatus","កំពុងបង្កើតសំឡេងខ្មែរ និងភ្ជាប់ជាមួយវីដេអូ...");$("dubResult").classList.remove("hidden");$("createDub").disabled=true;const blob=await new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl("/api/dub"));x.responseType="blob";x.upload.onprogress=e=>{if(e.lengthComputable)setStatus("dubStatus","កំពុងផ្ទុកវីដេអូ "+Math.round(e.loaded/e.total*100)+"%...")};x.onload=()=>{if(x.status>=200&&x.status<300)resolve(x.response);else{const fr=new FileReader();fr.onload=()=>{try{reject(new Error(JSON.parse(fr.result).error||"បង្កើតវីដេអូមិនបាន"))}catch(_){reject(new Error("បង្កើតវីដេអូមិនបាន ("+x.status+")"))}};fr.readAsText(x.response)}};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ"));x.send(form)});if(dubUrl)URL.revokeObjectURL(dubUrl);dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;setStatus("dubStatus","បានបង្កើតវីដេអូបញ្ចូលសំឡេងខ្មែររួចរាល់។ អ្នកអាចមើល និងទាញយក MP4 បាន។","good")}catch(e){setStatus("dubStatus","បង្កើតមិនបាន៖ "+e.message,"error")}finally{stopTimer();$("createDub").disabled=false}});
-  $("downloadDub").addEventListener("click",()=>{if(dubUrl){const a=document.createElement("a");a.href=dubUrl;a.download="Khmer-AI-Translated-Video.mp4";document.body.appendChild(a);a.click();a.remove()}});
+  $("downloadSrt").addEventListener("click",async()=>{if(!segments.length)return;const content=segments.map((s,i)=>(i+1)+"\n"+srtTime(s.start)+" --> "+srtTime(s.end)+"\n"+s.translation).join("\n\n")+"\n";const blob=new Blob(["\uFEFF"+content],{type:"text/plain;charset=utf-8"});await saveLibraryFile("Khmer-Subtitles.srt",blob,"SRT");downloadBlob(blob,"Khmer-Subtitles.srt")});
+  $("createDub").addEventListener("click",async()=>{const f=$("videoFile").files[0];if(!f||!segments.length)return;try{await ensureBackend();const form=new FormData();form.append("video",f);form.append("segments",JSON.stringify(segments.map(s=>({start:s.start,end:s.end,translation:s.translation}))));form.append("gender",$("voiceGender").value);startTimer();setStatus("dubStatus","កំពុងបង្កើតសំឡេងខ្មែរ និងភ្ជាប់ជាមួយវីដេអូ...");$("dubResult").classList.remove("hidden");$("createDub").disabled=true;const blob=await new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl("/api/dub"));x.responseType="blob";x.upload.onprogress=e=>{if(e.lengthComputable)setStatus("dubStatus","កំពុងផ្ទុកវីដេអូ "+Math.round(e.loaded/e.total*100)+"%...")};x.onload=()=>{if(x.status>=200&&x.status<300)resolve(x.response);else{const fr=new FileReader();fr.onload=()=>{try{reject(new Error(JSON.parse(fr.result).error||"បង្កើតវីដេអូមិនបាន"))}catch(_){reject(new Error("បង្កើតវីដេអូមិនបាន ("+x.status+")"))}};fr.readAsText(x.response)}};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ"));x.send(form)});if(dubUrl)URL.revokeObjectURL(dubUrl);dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;setStatus("dubStatus","បានបង្កើតវីដេអូបញ្ចូលសំឡេងខ្មែររួចរាល់។ អ្នកអាចមើល និងទាញយក MP4 បាន។","good")}catch(e){setStatus("dubStatus","បង្កើតមិនបាន៖ "+e.message,"error")}finally{stopTimer();$("createDub").disabled=false}});
+  $("downloadDub").addEventListener("click",async()=>{if(dubBlob){await saveLibraryFile("Khmer-AI-Translated-Video.mp4",dubBlob,"វីដេអូ MP4");downloadBlob(dubBlob,"Khmer-AI-Translated-Video.mp4")}});
   $("translateText").addEventListener("click",async()=>{const t=$("sourceText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូលអត្ថបទដើមជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបកប្រែអត្ថបទ...");const r=await fetch(apiUrl("/api/translate"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,sourceLanguage:$("textLanguage").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"បកប្រែមិនបាន");$("khmerText").value=d.translation||d.translatedText||"";setStatus("textStatus","បកប្រែអត្ថបទរួចរាល់។","good")}catch(e){setStatus("textStatus","បកប្រែមិនបាន៖ "+e.message,"error")}});
-  $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
-  $("downloadAudio").addEventListener("click",()=>{if(audioUrl){const a=document.createElement("a");a.href=audioUrl;a.download="Khmer-Voice.mp3";document.body.appendChild(a);a.click();a.remove()}});
+  $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();audioBlob=blob;if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
+  $("downloadAudio").addEventListener("click",async()=>{if(audioBlob){await saveLibraryFile("Khmer-Voice.mp3",audioBlob,"សំឡេង MP3");downloadBlob(audioBlob,"Khmer-Voice.mp3")}});
+  renderLibrary();
   checkBackend().catch(()=>{});
 })();
 </script>
