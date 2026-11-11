@@ -281,12 +281,12 @@ function cinematicProsody(emotion, gender) {
   const mood = String(emotion || "neutral").toLowerCase();
   const male = validateVoice(gender) === "km-KH-PisethNeural";
   const presets = {
-    neutral: { rate: "-4%", pitch: male ? "-3%" : "+0%", volume: "+0%" },
-    calm: { rate: "-9%", pitch: male ? "-5%" : "-2%", volume: "+0%" },
-    sad: { rate: "-12%", pitch: male ? "-7%" : "-4%", volume: "-4%" },
+    neutral: { rate: "+5%", pitch: male ? "-3%" : "+0%", volume: "+0%" },
+    calm: { rate: "-3%", pitch: male ? "-5%" : "-2%", volume: "+0%" },
+    sad: { rate: "-6%", pitch: male ? "-7%" : "-4%", volume: "-4%" },
     angry: { rate: "+4%", pitch: male ? "-2%" : "+3%", volume: "+5%" },
     excited: { rate: "+7%", pitch: male ? "+2%" : "+5%", volume: "+4%" },
-    dramatic: { rate: "-8%", pitch: male ? "-6%" : "-2%", volume: "+3%" },
+    dramatic: { rate: "-3%", pitch: male ? "-6%" : "-2%", volume: "+3%" },
     whisper: { rate: "-10%", pitch: male ? "-4%" : "-2%", volume: "-18%" }
   };
   return presets[mood] || presets.neutral;
@@ -343,18 +343,19 @@ async function runFfmpeg(args) {
 }
 
 async function videoDuration(filePath) {
+  // Read container metadata without decoding every video frame. The previous
+  // null-output command could spend the full video runtime just to get duration.
   let output = "";
   try {
-    const result = await runFfmpeg(["-i", filePath, "-f", "null", "-"]);
-    output = `${result.stdout || ""}\n${result.stderr || ""}`;
+    const result = await runFfmpeg(["-hide_banner", "-i", filePath, "-t", "0", "-f", "null", "-"]);
+    output = `${result.stdout || ""}\\n${result.stderr || ""}`;
   } catch (error) {
-    output = `${error.stdout || ""}\n${error.stderr || ""}`;
+    output = `${error.stdout || ""}\\n${error.stderr || ""}`;
   }
-  const match = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const match = output.match(/Duration:\\s*(\\d+):(\\d+):(\\d+(?:\\.\\d+)?)/);
   if (!match) throw new Error("មិនអាចអានរយៈពេលវីដេអូបាន ឬឯកសារមិនមែនជាវីដេអូ");
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
-
 function normalizeSegments(input, duration) {
   if (!Array.isArray(input)) throw new Error("ទិន្នន័យ segments ត្រូវតែជា Array");
   return input.map(item => ({
@@ -439,9 +440,9 @@ async function createDubbedVideo(req, res, segments) {
       const combinedDuration = previous ? segment.end - previous.start : 0;
       const canMerge = previous &&
         previous.gender === gender &&
-        previous.segments.length < 4 &&
-        gap >= -0.15 && gap <= 0.8 &&
-        combinedDuration <= 10;
+        previous.segments.length < 8 &&
+        gap >= -0.2 && gap <= 1.2 &&
+        combinedDuration <= 18;
       if (canMerge) {
         previous.segments.push(segment);
         previous.end = Math.max(previous.end, segment.end);
@@ -463,7 +464,7 @@ async function createDubbedVideo(req, res, segments) {
     // Two carefully staggered TTS workers shorten total wait time without
     // flooding the upstream voice service. Set EDGE_TTS_CONCURRENCY=1 to
     // force sequential processing if the provider starts returning HTTP 429.
-    const ttsConcurrency = Math.max(1, Math.min(2, Number(process.env.EDGE_TTS_CONCURRENCY || 2)));
+    const ttsConcurrency = Math.max(1, Math.min(3, Number(process.env.EDGE_TTS_CONCURRENCY || 3)));
     for (let offset = 0; offset < voiceJobs.length; offset += ttsConcurrency) {
       const batch = [];
       for (let index = offset; index < Math.min(offset + ttsConcurrency, voiceJobs.length); index++) {
@@ -473,7 +474,7 @@ async function createDubbedVideo(req, res, segments) {
           ? job.segments.map(item => item.translation.trim().replace(/[។.!?…]+$/u, "")).join("។ ")
           : job.text;
         const task = (async () => {
-          if (index > offset) await sleep(1500);
+          if (index > offset) await sleep(350);
           const startedAt = Date.now();
           await synthesizeKhmer(speechText, job.gender, audioFile, job.emotion, "cinematic");
           console.log(`[DUB TTS] Job ${index + 1}/${voiceJobs.length} completed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
@@ -483,7 +484,7 @@ async function createDubbedVideo(req, res, segments) {
       }
       const completed = await Promise.all(batch);
       audioFiles.push(...completed);
-      if (offset + ttsConcurrency < voiceJobs.length) await sleep(500);
+      if (offset + ttsConcurrency < voiceJobs.length) await sleep(250);
     }
     audioFiles.sort((a, b) => a.index - b.index);
 
@@ -508,7 +509,7 @@ async function createDubbedVideo(req, res, segments) {
 
     filters.push(
       `${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0,` +
-      "loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
+      "alimiter=limit=0.95[aout]"
     );
 
     const audioFilterArgs = [
