@@ -461,17 +461,32 @@ async function createDubbedVideo(req, res, segments) {
 
     console.log(`[DUB] ${valid.length} subtitle segments grouped into ${voiceJobs.length} Khmer TTS requests`);
     const audioFiles = [];
-    for (let index = 0; index < voiceJobs.length; index++) {
-      const job = voiceJobs[index];
-      const audioFile = path.join(work, `voice-${index}.mp3`);
-      const speechText = job.segments.length > 1
-        ? job.segments.map(item => item.translation.trim().replace(/[។.!?…]+$/u, "")).join("។ ")
-        : job.text;
-      await synthesizeKhmer(speechText, job.gender, audioFile, job.emotion, "cinematic");
-      audioFiles.push({ path: audioFile, start: job.start });
-      // Keep a modest pause between requests to reduce upstream HTTP 429s.
-      if (index < voiceJobs.length - 1) await sleep(900);
+    // Two carefully staggered TTS workers shorten total wait time without
+    // flooding the upstream voice service. Set EDGE_TTS_CONCURRENCY=1 to
+    // force sequential processing if the provider starts returning HTTP 429.
+    const ttsConcurrency = Math.max(1, Math.min(2, Number(process.env.EDGE_TTS_CONCURRENCY || 2)));
+    for (let offset = 0; offset < voiceJobs.length; offset += ttsConcurrency) {
+      const batch = [];
+      for (let index = offset; index < Math.min(offset + ttsConcurrency, voiceJobs.length); index++) {
+        const job = voiceJobs[index];
+        const audioFile = path.join(work, `voice-${index}.mp3`);
+        const speechText = job.segments.length > 1
+          ? job.segments.map(item => item.translation.trim().replace(/[។.!?…]+$/u, "")).join("។ ")
+          : job.text;
+        const task = (async () => {
+          if (index > offset) await sleep(1500);
+          const startedAt = Date.now();
+          await synthesizeKhmer(speechText, job.gender, audioFile, job.emotion, "cinematic");
+          console.log(`[DUB TTS] Job ${index + 1}/${voiceJobs.length} completed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+          return { path: audioFile, start: job.start, index };
+        })();
+        batch.push(task);
+      }
+      const completed = await Promise.all(batch);
+      audioFiles.push(...completed);
+      if (offset + ttsConcurrency < voiceJobs.length) await sleep(500);
     }
+    audioFiles.sort((a, b) => a.index - b.index);
 
     let hasBackground = true;
     try {
