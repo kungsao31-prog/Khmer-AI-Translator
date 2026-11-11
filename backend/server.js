@@ -52,6 +52,10 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 fs.mkdirSync(TMP, { recursive: true });
 
+// In-process video jobs let the phone upload once, poll while AI works, then download the finished MP4.
+// Keep the Render service at one instance unless job state and files are moved to shared storage.
+const videoJobs = new Map();
+
 app.disable("x-powered-by");
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: "2mb" }));
@@ -418,7 +422,7 @@ async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
   }
 }
 
-async function createDubbedVideo(req, res, segments) {
+async function createDubbedVideo(req, res, segments, options = {}) {
   if (!req.file) throw new Error("សូមជ្រើសរើសវីដេអូ");
   const work = path.join(TMP, randomUUID());
   await fs.promises.mkdir(work, { recursive: true });
@@ -551,6 +555,8 @@ async function createDubbedVideo(req, res, segments) {
     const stat = await fs.promises.stat(output);
     if (!stat.size) throw new Error("FFmpeg មិនបានបង្កើតវីដេអូចេញ");
 
+    if (options.returnFile) return { output, work, size: stat.size };
+
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Length", String(stat.size));
     res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
@@ -673,6 +679,93 @@ app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"
     throw error;
   }
 }));
+
+// Asynchronous one-step video translation. The phone polls status instead of holding one long HTTP request open.
+app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
+  const id = randomUUID();
+  const job = {
+    id,
+    status: "processing",
+    stage: "queued",
+    createdAt: Date.now(),
+    output: null,
+    work: null,
+    input: req.file.path,
+    error: null,
+    size: 0
+  };
+  videoJobs.set(id, job);
+  res.status(202).json({ ok: true, jobId: id, status: job.status });
+
+  setImmediate(async () => {
+    try {
+      job.stage = "analyzing_video";
+      const result = await analyzeAndTranslateVideo(
+        req.file.path,
+        getMimeType(req.file),
+        req.file.originalname
+      );
+      if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
+      job.stage = "creating_khmer_voice_and_mp4";
+      const built = await createDubbedVideo(req, null, result.segments, { returnFile: true });
+      job.output = built.output;
+      job.work = built.work;
+      job.size = built.size;
+      job.duration = result.duration;
+      job.segmentCount = result.segments.length;
+      job.stage = "completed";
+      job.status = "completed";
+      console.log(`[VIDEO JOB] ${id} completed: ${built.size} bytes, ${result.segments.length} segments`);
+    } catch (error) {
+      job.status = "failed";
+      job.stage = "failed";
+      job.error = String(error?.message || "ដំណើរការវីដេអូមិនបាន");
+      await fs.promises.unlink(job.input).catch(() => {});
+      if (job.work) await fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
+      console.error(`[VIDEO JOB] ${id} failed:`, error);
+    }
+  });
+}));
+
+app.get("/api/video/jobs/:id", (req, res) => {
+  const job = videoJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+  res.json({
+    ok: true,
+    jobId: job.id,
+    status: job.status,
+    stage: job.stage,
+    error: job.error,
+    size: job.size || 0,
+    duration: job.duration || 0,
+    segmentCount: job.segmentCount || 0
+  });
+});
+
+app.get("/api/video/jobs/:id/download", (req, res) => {
+  const job = videoJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+  if (job.status !== "completed" || !job.output) {
+    return res.status(409).json({ ok: false, error: "វីដេអូមិនទាន់រួចរាល់ទេ" });
+  }
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Content-Length", String(job.size));
+  res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(job.output, error => {
+    if (error) {
+      console.error("[VIDEO JOB] Download failed:", error.message);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "ទាញយក MP4 មិនបាន។ សូមសាកល្បងម្ដងទៀត។" });
+      else res.destroy(error);
+      return;
+    }
+    console.log(`[VIDEO JOB] ${job.id} delivered ${job.size} bytes`);
+    fs.promises.unlink(job.input).catch(() => {});
+    if (job.work) fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
+    videoJobs.delete(job.id);
+  });
+});
 
 // Existing frontend compatibility: client sends video + JSON segments
 app.post("/api/dub", upload.single("video"), asyncRoute(async (req, res) => {
