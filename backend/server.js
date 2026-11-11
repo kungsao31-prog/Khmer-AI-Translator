@@ -343,16 +343,15 @@ async function runFfmpeg(args) {
 }
 
 async function videoDuration(filePath) {
-  // Read container metadata without decoding every video frame. The previous
-  // null-output command could spend the full video runtime just to get duration.
+  // Read container metadata without decoding every video frame.
   let output = "";
   try {
     const result = await runFfmpeg(["-hide_banner", "-i", filePath, "-t", "0", "-f", "null", "-"]);
-    output = `${result.stdout || ""}\\n${result.stderr || ""}`;
+    output = String(result.stdout || "") + "\n" + String(result.stderr || "");
   } catch (error) {
-    output = `${error.stdout || ""}\\n${error.stderr || ""}`;
+    output = String(error.stdout || "") + "\n" + String(error.stderr || "");
   }
-  const match = output.match(/Duration:\\s*(\\d+):(\\d+):(\\d+(?:\\.\\d+)?)/);
+  const match = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (!match) throw new Error("មិនអាចអានរយៈពេលវីដេអូបាន ឬឯកសារមិនមែនជាវីដេអូ");
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
