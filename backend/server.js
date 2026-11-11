@@ -96,7 +96,7 @@ function isTemporaryGeminiError(error) {
   const message = String(error?.message || "").toLowerCase();
   return [0, 408, 429, 500, 502, 503, 504].includes(Number(error?.status)) ||
     String(error?.apiStatus || "").toUpperCase() === "RESOURCE_EXHAUSTED" ||
-    /high demand|overloaded|rate.?limit|resource.?exhausted|temporarily unavailable|try again later/.test(message);
+    /high demand|overloaded|rate.?limit|resource.?exhausted|temporarily unavailable|try again later|server response:\\s*429|\\b429\\b|too many requests/.test(message);
 }
 
 function sleep(ms) {
@@ -297,18 +297,41 @@ async function synthesizeKhmer(text, gender, outputPath, emotion = "neutral", st
   const prosody = style === "cinematic"
     ? cinematicProsody(emotion, gender)
     : { rate: "-2%", pitch: "default", volume: "default" };
-  const tts = new EdgeTTS({
-    voice,
-    lang: "km-KH",
-    outputFormat: "audio-24khz-48kbitrate-mono-mp3",
-    rate: prosody.rate,
-    pitch: prosody.pitch,
-    volume: prosody.volume,
-    timeout: 60000
-  });
-  await tts.ttsPromise(text, outputPath);
-  const stat = await fs.promises.stat(outputPath);
-  if (!stat.size) throw new Error("សេវាសំឡេងខ្មែរបានបង្កើតឯកសារទទេ");
+
+  // Edge TTS may temporarily return HTTP 429 when several subtitle segments
+  // are synthesized in quick succession. Retry with increasing delays.
+  const attempts = Math.max(1, Math.min(4, Number(process.env.EDGE_TTS_RETRY_ATTEMPTS || 3)));
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await fs.promises.unlink(outputPath).catch(() => {});
+      const tts = new EdgeTTS({
+        voice,
+        lang: "km-KH",
+        outputFormat: "audio-24khz-48kbitrate-mono-mp3",
+        rate: prosody.rate,
+        pitch: prosody.pitch,
+        volume: prosody.volume,
+        timeout: 90000
+      });
+      await tts.ttsPromise(text, outputPath);
+      const stat = await fs.promises.stat(outputPath);
+      if (!stat.size) throw new Error("សេវាសំឡេងខ្មែរបានបង្កើតឯកសារទទេ");
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = String(error?.message || error);
+      const retryable = /429|too many requests|rate.?limit|503|502|temporarily unavailable|timeout|timed out|socket hang up/i.test(message);
+      console.warn(`[EDGE TTS] Attempt ${attempt}/${attempts} failed: ${message}`);
+      await fs.promises.unlink(outputPath).catch(() => {});
+      if (!retryable || attempt === attempts) break;
+      await sleep(Math.min(15000, 2500 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 500));
+    }
+  }
+  if (/429|too many requests|rate.?limit/i.test(String(lastError?.message || lastError))) {
+    throw new Error("សេវាបង្កើតសំឡេងខ្មែរកំពុងមមាញឹក (HTTP 429)។ ប្រព័ន្ធបានសាកល្បងម្ដងទៀតហើយ ប៉ុន្តែសេវានៅតែរវល់។ សូមរង់ចាំ 1-2 នាទី រួចសាកល្បងម្ដងទៀត។");
+  }
+  throw lastError || new Error("បង្កើតសំឡេងខ្មែរមិនបាន");
 }
 
 async function runFfmpeg(args) {
@@ -413,6 +436,8 @@ async function createDubbedVideo(req, res, segments) {
       const segmentGender = valid[index].gender || req.body.gender || "female";
       await synthesizeKhmer(valid[index].translation, segmentGender, audioFile, valid[index].emotion, "cinematic");
       audioFiles.push(audioFile);
+      // Pace requests to avoid triggering Edge TTS rate limits on long videos.
+      if (index < valid.length - 1) await sleep(900);
     }
 
     let hasBackground = true;
