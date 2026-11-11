@@ -46,6 +46,101 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
+      - name: Add native Android Downloads bridge
+        run: |
+          mkdir -p android/app/src/main/java/com/khmeraitranslator/pro
+          cat > android/app/src/main/java/com/khmeraitranslator/pro/MainActivity.java <<'JAVA'
+          package com.khmeraitranslator.pro;
+          
+          import android.content.ContentValues;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+          import android.util.Base64;
+          import android.webkit.JavascriptInterface;
+          import com.getcapacitor.BridgeActivity;
+          import java.io.OutputStream;
+          import java.util.Map;
+          import java.util.UUID;
+          import java.util.concurrent.ConcurrentHashMap;
+          
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getBridge().getWebView().addJavascriptInterface(new AndroidFileSaver(), "AndroidFileSaver");
+              }
+          
+              private class AndroidFileSaver {
+                  private final Map<String, Uri> uris = new ConcurrentHashMap<>();
+                  private final Map<String, OutputStream> streams = new ConcurrentHashMap<>();
+          
+                  @JavascriptInterface
+                  public String startSave(String name, String mimeType) {
+                      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return "ERROR:ការរក្សាទុកផ្ទាល់ត្រូវការ Android 10 ឡើងទៅ";
+                      try {
+                          String safeName = name == null ? "Khmer-video.mp4" : name.replace("/", "_").replace("\\", "_");
+                          ContentValues values = new ContentValues();
+                          values.put(MediaStore.MediaColumns.DISPLAY_NAME, safeName);
+                          values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType == null ? "application/octet-stream" : mimeType);
+                          values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Khmer AI Translator");
+                          values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                          Uri uri = MainActivity.this.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                          if (uri == null) return "ERROR:បង្កើតឯកសារក្នុងថត Downloads មិនបាន";
+                          OutputStream stream = MainActivity.this.getContentResolver().openOutputStream(uri, "w");
+                          if (stream == null) {
+                              MainActivity.this.getContentResolver().delete(uri, null, null);
+                              return "ERROR:បើកឯកសារសម្រាប់សរសេរមិនបាន";
+                          }
+                          String id = UUID.randomUUID().toString();
+                          uris.put(id, uri);
+                          streams.put(id, stream);
+                          return id;
+                      } catch (Exception e) { return "ERROR:" + e.getMessage(); }
+                  }
+          
+                  @JavascriptInterface
+                  public String writeChunk(String id, String base64) {
+                      try {
+                          OutputStream stream = streams.get(id);
+                          if (stream == null) return "ERROR:មិនរកឃើញឯកសារកំពុងរក្សាទុក";
+                          byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                          synchronized (stream) { stream.write(bytes); }
+                          return "OK";
+                      } catch (Exception e) { return "ERROR:" + e.getMessage(); }
+                  }
+          
+                  @JavascriptInterface
+                  public String finishSave(String id) {
+                      try {
+                          OutputStream stream = streams.remove(id);
+                          Uri uri = uris.remove(id);
+                          if (stream == null || uri == null) return "ERROR:មិនអាចបញ្ចប់ឯកសារបាន";
+                          stream.flush();
+                          stream.close();
+                          ContentValues values = new ContentValues();
+                          values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                          MainActivity.this.getContentResolver().update(uri, values, null, null);
+                          return "OK";
+                      } catch (Exception e) { return "ERROR:" + e.getMessage(); }
+                  }
+          
+                  @JavascriptInterface
+                  public void cancelSave(String id) {
+                      try {
+                          OutputStream stream = streams.remove(id);
+                          if (stream != null) stream.close();
+                          Uri uri = uris.remove(id);
+                          if (uri != null) MainActivity.this.getContentResolver().delete(uri, null, null);
+                      } catch (Exception ignored) {}
+                  }
+              }
+          }
+          
+          JAVA
+
       - name: Build Android APK
         run: |
           cd android
