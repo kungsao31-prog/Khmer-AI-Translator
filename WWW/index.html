@@ -184,25 +184,39 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     const expectedMs=Math.max(45000,Math.min(240000,clipSeconds*2500));
     estimateTimer=setInterval(()=>{const fraction=Math.min(.98,(Date.now()-started)/expectedMs);setProgress(18+fraction*64,"AI កំពុងស្គេន បកប្រែ និងបង្កើតសំឡេង (ភាគរយប្រហែល)",true)},1000);
   }
-  function requestDubbedVideo(form,onUpload,onServer,onDownload){
-    return new Promise((resolve,reject)=>{
-      const x=new XMLHttpRequest();x.open("POST",apiUrl("/api/video/translate-and-dub"));x.responseType="blob";x.timeout=15*60*1000;
-      x.upload.onprogress=e=>{if(e.lengthComputable)onUpload(Math.round(e.loaded/e.total*100))};
-      x.upload.onload=()=>onServer();
-      x.onprogress=e=>{if(e.lengthComputable&&e.total>0)onDownload(Math.round(e.loaded/e.total*100),e.loaded,e.total)};
-      x.onload=async()=>{
-        const result=x.response;
-        if(x.status>=200&&x.status<300){
-          if(!result||result.size<1024){reject(new Error("ម៉ាស៊ីនមេបានផ្ញើឯកសារ MP4 ទទេ ឬមិនពេញលេញ"));return}
-          const type=(result.type||"").toLowerCase();
-          if(type.includes("json")||type.includes("text")){const message=await result.text().catch(()=>"");let error="ម៉ាស៊ីនមេមិនបានផ្ញើ MP4 ត្រឹមត្រូវ";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error));return}
-          resolve(result);
-        }else{const message=result?await result.text().catch(()=>""):"";let error="បង្កើតវីដេអូមិនបាន ("+x.status+")";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error))}
-      };
-      x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));
-      x.ontimeout=()=>reject(new Error("ការបកប្រែចំណាយពេលលើស 15 នាទី។ សូមពិនិត្យ Backend ហើយសាកល្បងម្ដងទៀត។"));
-      x.onabort=()=>reject(new Error("ដំណើរការត្រូវបានបោះបង់"));x.send(form);
-    });
+  async function requestDubbedVideo(form,onUpload,onServer,onDownload){
+    const job=await xhrUpload("/api/video/jobs",form,onUpload);
+    if(!job||!job.jobId)throw new Error("Backend មិនបានផ្ដល់លេខការងារវីដេអូ");
+    onServer();
+    const jobUrl=apiUrl("/api/video/jobs/"+encodeURIComponent(job.jobId));
+    let completed=false;
+    for(let attempt=0;attempt<720;attempt++){
+      await new Promise(resolve=>setTimeout(resolve,2500));
+      const response=await fetch(jobUrl,{cache:"no-store"});
+      const state=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(state.error||"ពិនិត្យស្ថានភាពការងារមិនបាន");
+      if(state.status==="failed")throw new Error(state.error||"បកប្រែវីដេអូមិនបាន");
+      if(state.status==="completed"){
+        completed=true;
+        break;
+      }
+      const stage=state.stage==="analyzing_video"
+        ?"AI កំពុងស្គេន និងបកប្រែវីដេអូ"
+        :state.stage==="creating_khmer_voice_and_mp4"
+          ?"កំពុងបង្កើតសំឡេងខ្មែរ និង MP4"
+          :"កំពុងរៀបចំការងារ";
+      setStatus("videoStatus",stage+"។ សូមកុំបិទកម្មវិធី។");
+    }
+    if(!completed)throw new Error("ការងារចំណាយពេលលើស 30 នាទី។ សូមពិនិត្យស្ថានភាព Backend មុនសាកល្បងម្ដងទៀត។");
+    const downloadResponse=await fetch(jobUrl+"/download",{cache:"no-store"});
+    if(!downloadResponse.ok){
+      const detail=await downloadResponse.json().catch(()=>({}));
+      throw new Error(detail.error||"ទាញយក MP4 ពី Backend មិនបាន");
+    }
+    const blob=await downloadResponse.blob();
+    if(!blob||blob.size<1024)throw new Error("ម៉ាស៊ីនមេបានផ្ញើ MP4 ទទេ ឬមិនពេញលេញ");
+    onDownload(100,blob.size,blob.size);
+    return blob;
   }
   async function processVideo(file){
     if(isVideoProcessing)return;
