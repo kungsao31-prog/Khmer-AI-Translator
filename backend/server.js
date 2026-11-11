@@ -522,30 +522,60 @@ async function createDubbedVideo(req, res, segments) {
       "loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
     );
 
-    args.push(
+    const audioFilterArgs = [
       "-filter_complex", filters.join(";"),
       "-map", "0:v:0",
       "-map", "[aout]",
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-crf", "23",
       "-c:a", "aac",
-      "-b:a", "192k",
+      "-b:a", "160k",
       "-movflags", "+faststart",
-      "-t", String(duration),
-      output
-    );
+      "-t", String(duration)
+    ];
 
-    await runFfmpeg(args);
+    // Audio is the only changed stream. Copy the original video stream first:
+    // this avoids expensive H.264 re-encoding and greatly reduces RAM/CPU use.
+    const muxStartedAt = Date.now();
+    try {
+      await runFfmpeg([
+        ...args,
+        ...audioFilterArgs,
+        "-c:v", "copy",
+        output
+      ]);
+      console.log(`[DUB MP4] Stream-copy mux completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
+    } catch (copyError) {
+      console.warn(`[DUB MP4] Stream-copy mux unavailable; using low-memory H.264 fallback: ${copyError.message}`);
+      await fs.promises.unlink(output).catch(() => {});
+      await runFfmpeg([
+        ...args,
+        ...audioFilterArgs,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "25",
+        "-threads", "1",
+        "-filter_threads", "1",
+        "-filter_complex_threads", "1",
+        output
+      ]);
+      console.log(`[DUB MP4] Low-memory encode completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
+    }
     const stat = await fs.promises.stat(output);
     if (!stat.size) throw new Error("FFmpeg មិនបានបង្កើតវីដេអូចេញ");
 
     res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", String(stat.size));
     res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
+    res.setHeader("Cache-Control", "no-store");
     res.sendFile(output, error => {
       fs.promises.unlink(req.file.path).catch(() => {});
       fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
-      if (error && !res.headersSent) res.status(500).end();
+      if (error) {
+        console.error("[DUB MP4] File delivery failed:", error.message);
+        if (!res.headersSent) res.status(500).json({ ok: false, error: "បញ្ជូនឯកសារ MP4 មិនបាន។ សូមសាកល្បងម្ដងទៀត។" });
+        else res.destroy(error);
+      } else {
+        console.log(`[DUB MP4] Delivered ${stat.size} bytes successfully`);
+      }
     });
   } catch (error) {
     await fs.promises.unlink(req.file.path).catch(() => {});
