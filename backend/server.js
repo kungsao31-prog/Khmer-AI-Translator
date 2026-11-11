@@ -41,7 +41,7 @@ const API_KEY = process.env.GEMINI_API_KEY || "";
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || TEXT_MODEL;
 // Comma-separated fallback model IDs. Configure these in Render if needed.
-const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash,gemini-3.5-flash-lite")
+const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite")
   .split(",").map(value => value.trim()).filter(Boolean);
 const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
 const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
