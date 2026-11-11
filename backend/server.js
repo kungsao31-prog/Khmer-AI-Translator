@@ -15,7 +15,7 @@
  * - Edge TTS generates synthetic Khmer neural narration; it is not a human recording.
  * - Video analysis estimates speaker gender per segment; uncertain speakers use the selected fallback voice.
  * - Cinematic style applies restrained rate/pitch/volume prosody; it is not studio voice acting.
- * - Video dubbing is speech mixed over the original audio at reduced volume.
+ * - Video dubbing replaces the original audio completely; only Khmer narration is included.
  */
 
 "use strict";
@@ -423,7 +423,6 @@ async function createDubbedVideo(req, res, segments) {
   const work = path.join(TMP, randomUUID());
   await fs.promises.mkdir(work, { recursive: true });
   const output = path.join(work, "khmer-dub.mp4");
-  const background = path.join(work, "background.wav");
 
   try {
     const duration = await videoDuration(req.file.path);
@@ -488,26 +487,16 @@ async function createDubbedVideo(req, res, segments) {
     }
     audioFiles.sort((a, b) => a.index - b.index);
 
-    let hasBackground = true;
-    try {
-      await runFfmpeg([
-        "-y", "-i", req.file.path, "-vn",
-        "-ac", "2", "-ar", "44100", "-t", String(duration), background
-      ]);
-    } catch (_) {
-      hasBackground = false;
-    }
-
-    const args = ["-y", "-i", req.file.path];
-    if (hasBackground) {
-      args.push("-i", background);
-    } else {
-      args.push("-f", "lavfi", "-t", String(duration), "-i",
-        "anullsrc=channel_layout=stereo:sample_rate=44100");
-    }
+    // Replace the source audio entirely with digital silence. Khmer voice
+    // tracks are mixed over this silent bed, so no original language/music leaks.
+    const args = [
+      "-y", "-i", req.file.path,
+      "-f", "lavfi", "-t", String(duration), "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=44100"
+    ];
     for (const audioFile of audioFiles) args.push("-i", audioFile.path);
 
-    const filters = ["[1:a]volume=0.16,apad,atrim=duration=" + duration + "[bg]"];
+    const filters = ["[1:a]atrim=duration=" + duration + "[bg]"];
     const mixInputs = ["[bg]"];
 
     audioFiles.forEach((audioFile, index) => {
