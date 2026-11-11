@@ -430,14 +430,47 @@ async function createDubbedVideo(req, res, segments) {
     const valid = normalizeSegments(segments, duration);
     if (!valid.length) throw new Error("មិនមានអត្ថបទខ្មែរសម្រាប់បញ្ចូលសំឡេង");
 
+    // Combine nearby subtitle segments into short speech jobs. This cuts
+    // Edge TTS requests substantially while retaining approximate timing.
+    const voiceJobs = [];
+    for (const segment of valid) {
+      const gender = segment.gender || req.body.gender || "female";
+      const previous = voiceJobs[voiceJobs.length - 1];
+      const gap = previous ? segment.start - previous.end : Infinity;
+      const combinedDuration = previous ? segment.end - previous.start : 0;
+      const canMerge = previous &&
+        previous.gender === gender &&
+        previous.segments.length < 4 &&
+        gap >= -0.15 && gap <= 0.8 &&
+        combinedDuration <= 10;
+      if (canMerge) {
+        previous.segments.push(segment);
+        previous.end = Math.max(previous.end, segment.end);
+        previous.text += " " + segment.translation;
+      } else {
+        voiceJobs.push({
+          start: segment.start,
+          end: segment.end,
+          gender,
+          emotion: segment.emotion,
+          segments: [segment],
+          text: segment.translation
+        });
+      }
+    }
+
+    console.log(`[DUB] ${valid.length} subtitle segments grouped into ${voiceJobs.length} Khmer TTS requests`);
     const audioFiles = [];
-    for (let index = 0; index < valid.length; index++) {
+    for (let index = 0; index < voiceJobs.length; index++) {
+      const job = voiceJobs[index];
       const audioFile = path.join(work, `voice-${index}.mp3`);
-      const segmentGender = valid[index].gender || req.body.gender || "female";
-      await synthesizeKhmer(valid[index].translation, segmentGender, audioFile, valid[index].emotion, "cinematic");
-      audioFiles.push(audioFile);
-      // Pace requests to avoid triggering Edge TTS rate limits on long videos.
-      if (index < valid.length - 1) await sleep(900);
+      const speechText = job.segments.length > 1
+        ? job.segments.map(item => item.translation.trim().replace(/[។.!?…]+$/u, "")).join("។ ")
+        : job.text;
+      await synthesizeKhmer(speechText, job.gender, audioFile, job.emotion, "cinematic");
+      audioFiles.push({ path: audioFile, start: job.start });
+      // Keep a modest pause between requests to reduce upstream HTTP 429s.
+      if (index < voiceJobs.length - 1) await sleep(900);
     }
 
     let hasBackground = true;
@@ -457,14 +490,14 @@ async function createDubbedVideo(req, res, segments) {
       args.push("-f", "lavfi", "-t", String(duration), "-i",
         "anullsrc=channel_layout=stereo:sample_rate=44100");
     }
-    for (const audioFile of audioFiles) args.push("-i", audioFile);
+    for (const audioFile of audioFiles) args.push("-i", audioFile.path);
 
     const filters = ["[1:a]volume=0.16,apad,atrim=duration=" + duration + "[bg]"];
     const mixInputs = ["[bg]"];
 
-    valid.forEach((segment, index) => {
+    audioFiles.forEach((audioFile, index) => {
       const label = `voice${index}`;
-      const delay = Math.max(0, Math.round(segment.start * 1000));
+      const delay = Math.max(0, Math.round(audioFile.start * 1000));
       filters.push(`[${index + 2}:a]adelay=${delay}|${delay},volume=1.0[${label}]`);
       mixInputs.push(`[${label}]`);
     });
