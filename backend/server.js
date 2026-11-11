@@ -40,6 +40,11 @@ const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || TEXT_MODEL;
+// Comma-separated fallback model IDs. Configure these in Render if needed.
+const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash,gemini-3.5-flash-lite")
+  .split(",").map(value => value.trim()).filter(Boolean);
+const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
+const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
 const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 100));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
@@ -78,31 +83,89 @@ function getGeminiText(data) {
     .trim();
 }
 
-async function geminiGenerate(model, contents, generationConfig = {}) {
+class GeminiApiError extends Error {
+  constructor(message, status = 0, apiStatus = "") {
+    super(message);
+    this.name = "GeminiApiError";
+    this.status = status;
+    this.apiStatus = apiStatus;
+  }
+}
+
+function isTemporaryGeminiError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return [0, 408, 429, 500, 502, 503, 504].includes(Number(error?.status)) ||
+    String(error?.apiStatus || "").toUpperCase() === "RESOURCE_EXHAUSTED" ||
+    /high demand|overloaded|rate.?limit|resource.?exhausted|temporarily unavailable|try again later/.test(message);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function geminiGenerateOnce(model, contents, generationConfig = {}) {
   const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": API_KEY
-    },
-    body: JSON.stringify({
-      contents,
-      generationConfig: {
-        temperature: 0.2,
-        ...generationConfig
-      }
-    })
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": API_KEY
+      },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          temperature: 0.2,
+          ...generationConfig
+        }
+      })
+    });
+  } catch (error) {
+    throw new GeminiApiError("មិនអាចភ្ជាប់ទៅសេវា Gemini បានទេ: " + error.message, 0);
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.error?.message || `Gemini API request failed (${response.status})`);
+    throw new GeminiApiError(
+      data?.error?.message || `Gemini API request failed (${response.status})`,
+      response.status,
+      data?.error?.status || ""
+    );
   }
 
   const text = getGeminiText(data);
-  if (!text) throw new Error("Gemini មិនបានផ្ញើអត្ថបទត្រឡប់មកវិញ");
+  if (!text) throw new GeminiApiError("Gemini មិនបានផ្ញើអត្ថបទត្រឡប់មកវិញ", 502);
   return text;
+}
+
+async function geminiGenerate(model, contents, generationConfig = {}) {
+  const models = [...new Set([model, ...FALLBACK_MODELS].filter(Boolean))];
+  let lastError;
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+    const selectedModel = models[modelIndex];
+    for (let attempt = 1; attempt <= GEMINI_RETRY_ATTEMPTS; attempt++) {
+      try {
+        const result = await geminiGenerateOnce(selectedModel, contents, generationConfig);
+        if (selectedModel !== model) {
+          console.warn(`[GEMINI] Primary model ${model} unavailable; fallback ${selectedModel} succeeded`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error;
+        const temporary = isTemporaryGeminiError(error);
+        console.warn(`[GEMINI] ${selectedModel} attempt ${attempt}/${GEMINI_RETRY_ATTEMPTS} failed (HTTP ${error.status || "network"}): ${error.message}`);
+        if (temporary && attempt < GEMINI_RETRY_ATTEMPTS) {
+          const delay = GEMINI_RETRY_BASE_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 300);
+          await sleep(delay);
+          continue;
+        }
+        if (!temporary || modelIndex === models.length - 1) throw error;
+        break;
+      }
+    }
+  }
+  throw lastError || new Error("សេវា Gemini មិនអាចដំណើរការបានទេ");
 }
 
 function stripJsonFence(text) {
@@ -543,8 +606,15 @@ app.use((err, req, res, next) => {
     });
   }
   console.error("[API ERROR]", err);
-  const message = err?.message || "Server error";
-  res.status(500).json({ ok: false, error: message });
+  const message = String(err?.message || "");
+  const temporary = isTemporaryGeminiError(err);
+  const status = temporary ? 503 : (Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500);
+  const khmerMessage = temporary
+    ? "សេវា AI កំពុងមមាញឹក ឬមានអ្នកប្រើច្រើន។ ប្រព័ន្ធបានសាកល្បងឡើងវិញ និងម៉ូដែលបម្រុងហើយ។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។"
+    : (/API key|permission|unauthorized|forbidden/i.test(message)
+      ? "ការភ្ជាប់ Gemini API Key មានបញ្ហា។ សូមពិនិត្យ GEMINI_API_KEY ក្នុង Render Environment។"
+      : message || "មានបញ្ហាក្នុងម៉ាស៊ីនមេ");
+  res.status(status).json({ ok: false, error: khmerMessage, retryable: temporary });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
