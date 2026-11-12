@@ -186,22 +186,50 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   }
   function requestDubbedVideo(form,onUpload,onServer,onDownload){
     return new Promise((resolve,reject)=>{
-      const x=new XMLHttpRequest();x.open("POST",apiUrl("/api/video/translate-and-dub"));x.responseType="blob";x.timeout=15*60*1000;
-      x.upload.onprogress=e=>{if(e.lengthComputable)onUpload(Math.round(e.loaded/e.total*100))};
-      x.upload.onload=()=>onServer();
-      x.onprogress=e=>{if(e.lengthComputable&&e.total>0)onDownload(Math.round(e.loaded/e.total*100),e.loaded,e.total)};
-      x.onload=async()=>{
-        const result=x.response;
-        if(x.status>=200&&x.status<300){
-          if(!result||result.size<1024){reject(new Error("ម៉ាស៊ីនមេបានផ្ញើឯកសារ MP4 ទទេ ឬមិនពេញលេញ"));return}
-          const type=(result.type||"").toLowerCase();
-          if(type.includes("json")||type.includes("text")){const message=await result.text().catch(()=>"");let error="ម៉ាស៊ីនមេមិនបានផ្ញើ MP4 ត្រឹមត្រូវ";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error));return}
-          resolve(result);
-        }else{const message=result?await result.text().catch(()=>""):"";let error="បង្កើតវីដេអូមិនបាន ("+x.status+")";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error))}
+      const upload=new XMLHttpRequest();upload.open("POST",apiUrl("/api/video/jobs"));upload.responseType="json";upload.timeout=15*60*1000;
+      upload.upload.onprogress=e=>{if(e.lengthComputable)onUpload(Math.round(e.loaded/e.total*100))};
+      upload.onload=async()=>{
+        let data=upload.response;
+        if(!data&&upload.responseText){try{data=JSON.parse(upload.responseText)}catch(_){}}
+        if(upload.status!==202||!data?.jobId){reject(new Error(data?.error||"Backend មិនអាចចាប់ផ្ដើមការងារបាន"));return}
+        onServer();
+        const jobId=data.jobId;let failures=0;const started=Date.now();
+        const poll=async()=>{
+          try{
+            const response=await fetch(apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)),{cache:"no-store"});
+            const job=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(job.error||"មិនអាចពិនិត្យស្ថានភាពការងារបាន");
+            failures=0;
+            if(job.status==="failed"){reject(new Error(job.error||"ការបកប្រែវីដេអូមិនបាន"));return}
+            if(job.status==="completed"){
+              onDownload(0,0,job.size||0);
+              const download=new XMLHttpRequest();download.open("GET",apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)+"/download"));download.responseType="blob";download.timeout=15*60*1000;
+              download.onprogress=e=>{if(e.lengthComputable&&e.total>0)onDownload(Math.round(e.loaded/e.total*100),e.loaded,e.total)};
+              download.onload=async()=>{
+                const blob=download.response;
+                if(download.status>=200&&download.status<300&&blob&&blob.size>1024)resolve(blob);
+                else{let message=blob?await blob.text().catch(()=>""):"";let error="ទាញយក MP4 មិនបាន";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error))}
+              };
+              download.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញពេលទាញយក MP4"));
+              download.ontimeout=()=>reject(new Error("ទាញយក MP4 ចំណាយពេលលើស 15 នាទី"));
+              download.send();return;
+            }
+            if(Date.now()-started>3*60*60*1000){reject(new Error("ការបកប្រែចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យសេវាកម្ម Backend។"));return}
+            setProgress(18,"AI កំពុងធ្វើការ · "+(job.stage||"processing"),true);
+            setStatus("videoStatus","AI កំពុងបកប្រែសំឡេងខ្មែរ។ សូមកុំបិទទំព័រ...");
+            setTimeout(poll,4000);
+          }catch(error){
+            failures++;
+            if(failures>=8){reject(error);return}
+            setTimeout(poll,Math.min(15000,3000*failures));
+          }
+        };
+        poll();
       };
-      x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));
-      x.ontimeout=()=>reject(new Error("ការបកប្រែចំណាយពេលលើស 15 នាទី។ សូមពិនិត្យ Backend ហើយសាកល្បងម្ដងទៀត។"));
-      x.onabort=()=>reject(new Error("ដំណើរការត្រូវបានបោះបង់"));x.send(form);
+      upload.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));
+      upload.ontimeout=()=>reject(new Error("ការផ្ទុកវីដេអូចំណាយពេលលើស 15 នាទី"));
+      upload.onabort=()=>reject(new Error("ការផ្ទុកត្រូវបានបោះបង់"));
+      upload.send(form);
     });
   }
   async function processVideo(file){
