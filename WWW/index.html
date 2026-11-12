@@ -223,7 +223,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
     if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}
     isVideoProcessing=true;stopEstimate();$("scanVideo").disabled=true;$("downloadDub").disabled=true;
-    $("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");$("dubPlayer").removeAttribute("src");
+    $("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");$("dubPlayer").removeAttribute("src");$("dubStatus").textContent="កំពុងដំណើរការ...";$("dubStatus").className="status";
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
     setProgress(0,"កំពុងរៀបចំវីដេអូ...",false);setStatus("dubStatus","កំពុងត្រៀមផ្ទុកវីដេអូទៅ Backend...");
     try{
@@ -234,7 +234,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
         ()=>{setProgress(18,"ផ្ទុករួច · AI កំពុងធ្វើការ",true);setStatus("videoStatus","ផ្ទុកវីដេអូរួចហើយ។ AI កំពុងស្គេន បកប្រែ និងបង្កើតសំឡេងខ្មែរ...");startEstimate()},
         (p,loaded,total)=>{stopEstimate();setProgress(82+p*.12,"កំពុងទទួល MP4 "+p+"% ("+(loaded/1048576).toFixed(1)+"/"+(total/1048576).toFixed(1)+" MB)",false);setStatus("videoStatus","វីដេអូខ្មែរបានបង្កើតរួច។ កំពុងទាញយក MP4...")}
       );
-      stopEstimate();dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;
+      stopEstimate();dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;$("dubResult").classList.remove("hidden");
       setProgress(94,"MP4 រួចរាល់ · កំពុងរក្សាទុកក្នុងទូរសព្ទ",false);setStatus("dubStatus","បង្កើត MP4 បានជោគជ័យ ("+(blob.size/1048576).toFixed(1)+" MB)។ កំពុងរក្សាទុកដោយស្វ័យប្រវត្តិ...");
       try{
         const message=await saveBlobToPhone(blob,"Khmer-AI-Translated-Video.mp4","video/mp4",p=>setProgress(94+p*.06,"កំពុងរក្សាទុក MP4 ក្នុងទូរសព្ទ "+p+"%",false));
