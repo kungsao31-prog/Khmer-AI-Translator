@@ -37,7 +37,12 @@ const execFileAsync = promisify(execFile);
 const app = express();
 
 const PORT = Number(process.env.PORT || 3000);
-const API_KEY = process.env.GEMINI_API_KEY || "";
+// HTTP header values must be ASCII. Trim pasted whitespace, but never silently alter an API key.
+const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
+const API_KEY_INVALID_CHAR = [...API_KEY].findIndex(char => {
+  const code = char.codePointAt(0);
+  return code < 0x21 || code > 0x7E;
+});
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
 const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || TEXT_MODEL;
 // Comma-separated fallback model IDs. Configure these in Render if needed.
@@ -94,6 +99,14 @@ function requireGeminiKey(req, res, next) {
     return res.status(503).json({
       ok: false,
       error: "មិនទាន់កំណត់ GEMINI_API_KEY នៅក្នុង Render Environment"
+    });
+  }
+  if (API_KEY_INVALID_CHAR !== -1) {
+    const badChar = [...API_KEY][API_KEY_INVALID_CHAR];
+    console.error(`[CONFIG] GEMINI_API_KEY contains a non-ASCII character at position ${API_KEY_INVALID_CHAR} (U+${badChar.codePointAt(0).toString(16).toUpperCase()}); key value hidden`);
+    return res.status(503).json({
+      ok: false,
+      error: "GEMINI_API_KEY មានតួអក្សរខ្មែរ ឬតួអក្សរមិនត្រឹមត្រូវ។ សូមដាក់ API Key ថ្មីពី Google AI Studio ក្នុង Render Environment។ កុំដាក់សញ្ញា ឬអក្សរខ្មែរនៅខាងមុខ/ខាងក្រោយ Key។"
     });
   }
   next();
