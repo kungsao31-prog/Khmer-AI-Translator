@@ -440,7 +440,7 @@ async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
 
     const parsed = parseJsonObject(raw);
     const duration = await videoDuration(filePath);
-    const segments = normalizeSegments(parsed.segments, duration);
+    const segments = normalizeSegments(parsed, duration);
     return {
       sourceLanguage: String(parsed.sourceLanguage || "unknown"),
       duration,
