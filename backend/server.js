@@ -513,7 +513,10 @@ async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
 - ស្គាល់ភាសាដើមដោយស្វ័យប្រវត្តិ។
 - ចម្លងអត្ថបទដើមឱ្យបានត្រឹមត្រូវតាមដែលអាចធ្វើបាន។
 - បកប្រែឱ្យទៅជាភាសាខ្មែរធម្មជាតិ ងាយស្តាប់។
-- start និង end ត្រូវជាពេលវេលាគិតជាវិនាទី (លេខទសភាគ) ហើយត្រូវសមស្របនឹងពេលសំឡេងនិយាយ។
+- start និង end ត្រូវជាពេលវេលាគិតជាវិនាទី (លេខទសភាគ) ដោយស្តាប់សំឡេង និងពិនិត្យចលនាបបូរមាត់ក្នុងរូបភាពជាមួយគ្នា។
+- start ត្រូវចាប់ពីពេលមាត់តួអង្គចាប់ផ្តើមនិយាយ ឬចាប់ផ្តើមចលនាដែលបង្ហាញថាកំពុងនិយាយ; កុំដាក់ start យឺតក្រោយចលនាមាត់។
+- end ត្រូវបញ្ចប់នៅពេលការនិយាយ និងចលនាមាត់ឈប់; កុំឱ្យពេលវេលាឃ្លាមួយរអិលទៅឃ្លាបន្ទាប់។
+- ប្រើសំឡេងជាគោល ហើយប្រើចលនាបបូរមាត់ជាភស្តុតាងជួយកែតម្រូវពេលវេលា; កុំប្រើកាយវិការទូទៅដែលមិនមែនជាការនិយាយដើម្បីកំណត់ពេលសំឡេង។
 - កុំបង្កើតពាក្យដែលមិនមានក្នុងសំឡេង។
 - បែងចែកជាឃ្លាខ្លីៗ មិនឱ្យលើស 600 ផ្នែក។
 - កំណត់ speakerId ឱ្យថេរសម្រាប់អ្នកនិយាយដដែល (ឧ. speaker-1, speaker-2)។
@@ -568,9 +571,9 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       // the individual timestamps inside a long combined sentence.
       const canMerge = previous &&
         previous.gender === gender &&
-        previous.segments.length < 4 &&
+        previous.segments.length < 2 &&
         gap >= -0.1 && gap <= 0.35 &&
-        combinedDuration <= 7.5;
+        combinedDuration <= 4.5;
       if (canMerge) {
         previous.segments.push(segment);
         previous.end = Math.max(previous.end, segment.end);
