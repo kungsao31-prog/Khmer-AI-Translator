@@ -164,8 +164,19 @@ async function geminiGenerate(model, contents, generationConfig = {}) {
         return result;
       } catch (error) {
         lastError = error;
-        const temporary = isTemporaryGeminiError(error);
+        const quotaMessage = String(error?.message || "").toLowerCase();
+        const dailyQuotaExhausted = Number(error?.status) === 429 &&
+          (quotaMessage.includes("per day limit exceeded") ||
+           quotaMessage.includes("requests per day") ||
+           quotaMessage.includes("daily quota"));
         console.warn(`[GEMINI] ${selectedModel} attempt ${attempt}/${GEMINI_RETRY_ATTEMPTS} failed (HTTP ${error.status || "network"}): ${error.message}`);
+        // Switching models cannot bypass a project-wide daily free-tier quota.
+        if (dailyQuotaExhausted) throw new GeminiApiError(
+          "កូតា Gemini Free ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ ឬប្រើ API project ដែលមានកូតាផ្សេង។",
+          429,
+          error.apiStatus
+        );
+        const temporary = isTemporaryGeminiError(error);
         if (temporary && attempt < GEMINI_RETRY_ATTEMPTS) {
           const delay = GEMINI_RETRY_BASE_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 300);
           await sleep(delay);
@@ -238,15 +249,15 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
   const uploadUrl = start.headers.get("x-goog-upload-url");
   if (!uploadUrl) throw new Error("Gemini មិនបានផ្ដល់ Upload URL");
 
-  const bytes = await fs.promises.readFile(filePath);
   const finish = await fetch(uploadUrl, {
     method: "POST",
     headers: {
-      "Content-Length": String(bytes.length),
+      "Content-Length": String(stat.size),
       "X-Goog-Upload-Offset": "0",
       "X-Goog-Upload-Command": "upload, finalize"
     },
-    body: bytes
+    body: fs.createReadStream(filePath),
+    duplex: "half"
   });
 
   const uploaded = await finish.json().catch(() => ({}));
