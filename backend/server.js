@@ -470,11 +470,14 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       const previous = voiceJobs[voiceJobs.length - 1];
       const gap = previous ? segment.start - previous.end : Infinity;
       const combinedDuration = previous ? segment.end - previous.start : 0;
+      // Keep each generated speech clip close to its original dialogue window.
+      // Large groups drift away from mouth movement because TTS cannot preserve
+      // the individual timestamps inside a long combined sentence.
       const canMerge = previous &&
         previous.gender === gender &&
-        previous.segments.length < 8 &&
-        gap >= -0.2 && gap <= 1.2 &&
-        combinedDuration <= 18;
+        previous.segments.length < 4 &&
+        gap >= -0.1 && gap <= 0.35 &&
+        combinedDuration <= 7.5;
       if (canMerge) {
         previous.segments.push(segment);
         previous.end = Math.max(previous.end, segment.end);
@@ -510,7 +513,12 @@ async function createDubbedVideo(req, res, segments, options = {}) {
           const startedAt = Date.now();
           await synthesizeKhmer(speechText, job.gender, audioFile, job.emotion, "cinematic");
           console.log(`[DUB TTS] Job ${index + 1}/${voiceJobs.length} completed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
-          return { path: audioFile, start: job.start, index };
+          return {
+            path: audioFile,
+            start: job.start,
+            targetDuration: Math.max(0.5, job.end - job.start),
+            index
+          };
         })();
         batch.push(task);
       }
@@ -532,16 +540,26 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     const filters = ["[1:a]atrim=duration=" + duration + "[bg]"];
     const mixInputs = ["[bg]"];
 
-    audioFiles.forEach((audioFile, index) => {
+    for (let index = 0; index < audioFiles.length; index++) {
+      const audioFile = audioFiles[index];
       const label = `voice${index}`;
       const delay = Math.max(0, Math.round(audioFile.start * 1000));
-      filters.push(`[${index + 2}:a]adelay=${delay}|${delay},volume=1.0[${label}]`);
+      const targetDuration = Math.max(0.5, Number(audioFile.targetDuration) || 0.5);
+      // Speed up only when the synthesized Khmer line is longer than its
+      // dialogue window. Shorter lines keep their natural pace and are padded.
+      const generatedDuration = await videoDuration(audioFile.path);
+      const tempo = Math.max(1, Math.min(2, generatedDuration / targetDuration));
+      filters.push(
+        `[${index + 2}:a]atempo=${tempo.toFixed(4)},` +
+        `loudnorm=I=-16:TP=-1.5:LRA=11,apad,atrim=duration=${targetDuration.toFixed(3)},` +
+        `adelay=${delay}|${delay},volume=1.15[${label}]`
+      );
       mixInputs.push(`[${label}]`);
-    });
+    }
 
     filters.push(
       `${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0,` +
-      "alimiter=limit=0.95[aout]"
+      "loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95[aout]"
     );
 
     const audioFilterArgs = [
