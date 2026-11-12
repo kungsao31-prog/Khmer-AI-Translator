@@ -190,7 +190,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     onServer();
     const jobUrl=apiUrl("/api/video/jobs/"+encodeURIComponent(job.jobId));
     let completed=false;
-    for(let attempt=0;attempt<720;attempt++){
+    for(let attempt=0;attempt<4320;attempt++){
       await new Promise(resolve=>setTimeout(resolve,2500));
       const response=await fetch(jobUrl,{cache:"no-store"});
       const state=await response.json().catch(()=>({}));
@@ -207,7 +207,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
           :"កំពុងរៀបចំការងារ";
       setStatus("videoStatus",stage+"។ សូមកុំបិទកម្មវិធី។");
     }
-    if(!completed)throw new Error("ការងារចំណាយពេលលើស 30 នាទី។ សូមពិនិត្យស្ថានភាព Backend មុនសាកល្បងម្ដងទៀត។");
+    if(!completed)throw new Error("ការងារចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យស្ថានភាព Backend មុនសាកល្បងម្ដងទៀត។");
     const downloadResponse=await fetch(jobUrl+"/download",{cache:"no-store"});
     if(!downloadResponse.ok){
       const detail=await downloadResponse.json().catch(()=>({}));
