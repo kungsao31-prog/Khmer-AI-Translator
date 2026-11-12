@@ -221,16 +221,61 @@ function stripJsonFence(text) {
     .trim();
 }
 
+function repairInvalidJsonEscapes(text) {
+  // Preserve valid JSON escapes, but turn stray backslashes (including malformed
+  // \\u sequences) into literal backslashes so JSON.parse can read model output.
+  let output = "";
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (!inString) {
+      output += ch;
+      if (ch === '"') inString = true;
+      continue;
+    }
+    if (ch === '"') {
+      output += ch;
+      inString = false;
+      continue;
+    }
+    if (ch !== "\\\\") {
+      output += ch;
+      continue;
+    }
+    const next = text[i + 1];
+    if (next && '"\\\\/bfnrt'.includes(next)) {
+      output += ch + next;
+      i++;
+      continue;
+    }
+    if (next === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))) {
+      output += text.slice(i, i + 6);
+      i += 5;
+      continue;
+    }
+    // Invalid escape: encode the backslash itself; process the next char normally.
+    output += "\\\\\\\\";
+  }
+  return output;
+}
+
 function parseJsonObject(text) {
   const cleaned = stripJsonFence(text);
-  try {
-    return JSON.parse(cleaned);
-  } catch (_) {
-    const first = cleaned.indexOf("{");
-    const last = cleaned.lastIndexOf("}");
-    if (first >= 0 && last > first) return JSON.parse(cleaned.slice(first, last + 1));
-    throw new Error("Gemini បានផ្ញើទិន្នន័យ JSON មិនត្រឹមត្រូវ");
+  const candidates = [cleaned, repairInvalidJsonEscapes(cleaned)];
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      const first = candidate.indexOf("{");
+      const last = candidate.lastIndexOf("}");
+      if (first >= 0 && last > first) {
+        try {
+          return JSON.parse(candidate.slice(first, last + 1));
+        } catch (_) {}
+      }
+    }
   }
+  throw new Error("Gemini បានផ្ញើ JSON មិនត្រឹមត្រូវ ទោះបានជួសជុលសញ្ញា escape ក៏ដោយ។ សូមសាកល្បងម្ដងទៀត។");
 }
 
 function getMimeType(file) {
