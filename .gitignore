@@ -37,10 +37,6 @@ temp/
 tmp/
 uploads/
 output/
-*.mp3
-*.wav
-*.m4a
-*.mp4
 
 # OS and editor files
 .DS_Store
