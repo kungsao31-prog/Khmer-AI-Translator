@@ -55,6 +55,19 @@ fs.mkdirSync(TMP, { recursive: true });
 // In-process video jobs let the phone upload once, poll while AI works, then download the finished MP4.
 // Keep the Render service at one instance unless job state and files are moved to shared storage.
 const videoJobs = new Map();
+let activeMediaJobId = null;
+const JOB_RETENTION_MS = 2 * 60 * 60 * 1000;
+
+function pruneFinishedJobs(jobs) {
+  const now = Date.now();
+  for (const [id, job] of jobs) {
+    if (!job.finishedAt || now - job.finishedAt < JOB_RETENTION_MS) continue;
+    if (job.input) fs.promises.unlink(job.input).catch(() => {});
+    for (const input of job.inputFiles || []) fs.promises.unlink(input).catch(() => {});
+    if (job.work) fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
+    jobs.delete(id);
+  }
+}
 
 app.disable("x-powered-by");
 app.use(cors({ origin: true }));
@@ -103,11 +116,22 @@ class GeminiApiError extends Error {
   }
 }
 
+function isQuotaOrRateLimitError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return Number(error?.status) === 429 ||
+    String(error?.apiStatus || "").toUpperCase() === "RESOURCE_EXHAUSTED" ||
+    /quota|rate.?limit|too many requests|resource.?exhausted/.test(message);
+}
+
+function isDailyQuotaError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return /per[_\\s-]?day|daily|requests per day|quota.{0,40}day|day.{0,40}quota|free[_\\s-]?tier.{0,40}(daily|day)/.test(message);
+}
+
 function isTemporaryGeminiError(error) {
   const message = String(error?.message || "").toLowerCase();
-  return [0, 408, 429, 500, 502, 503, 504].includes(Number(error?.status)) ||
-    String(error?.apiStatus || "").toUpperCase() === "RESOURCE_EXHAUSTED" ||
-    /high demand|overloaded|rate.?limit|resource.?exhausted|temporarily unavailable|try again later|server response:\\s*429|\\b429\\b|too many requests/.test(message);
+  return [0, 408, 500, 502, 503, 504].includes(Number(error?.status)) ||
+    /high demand|overloaded|temporarily unavailable|try again later/.test(message);
 }
 
 function sleep(ms) {
@@ -164,18 +188,18 @@ async function geminiGenerate(model, contents, generationConfig = {}) {
         return result;
       } catch (error) {
         lastError = error;
-        const quotaMessage = String(error?.message || "").toLowerCase();
-        const dailyQuotaExhausted = Number(error?.status) === 429 &&
-          (quotaMessage.includes("per day limit exceeded") ||
-           quotaMessage.includes("requests per day") ||
-           quotaMessage.includes("daily quota"));
         console.warn(`[GEMINI] ${selectedModel} attempt ${attempt}/${GEMINI_RETRY_ATTEMPTS} failed (HTTP ${error.status || "network"}): ${error.message}`);
-        // Switching models cannot bypass a project-wide daily free-tier quota.
-        if (dailyQuotaExhausted) throw new GeminiApiError(
-          "កូតា Gemini Free ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ ឬប្រើ API project ដែលមានកូតាផ្សេង។",
-          429,
-          error.apiStatus
-        );
+        // Do not retry other model IDs after a quota/rate-limit response.
+        if (isQuotaOrRateLimitError(error)) {
+          const daily = isDailyQuotaError(error);
+          throw new GeminiApiError(
+            daily
+              ? "កូតា Gemini ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ មុនពេលសាកល្បងម្ដងទៀត។"
+              : "Gemini បានកំណត់ចំនួនសំណើ (HTTP 429)។ ប្រព័ន្ធមិនប្ដូរម៉ូដែលបម្រុងដើម្បីជៀសវាងការស្នើសុំឥតប្រយោជន៍ទេ។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។",
+            Number(error.status) || 429,
+            error.apiStatus
+          );
+        }
         const temporary = isTemporaryGeminiError(error);
         if (temporary && attempt < GEMINI_RETRY_ATTEMPTS) {
           const delay = GEMINI_RETRY_BASE_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 300);
@@ -574,6 +598,8 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     );
 
     const audioFilterArgs = [
+      "-filter_threads", "1",
+      "-filter_complex_threads", "1",
       "-filter_complex", filters.join(";"),
       "-map", "0:v:0",
       "-map", "[aout]",
@@ -741,7 +767,13 @@ app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"
 // Asynchronous one-step video translation. The phone polls status instead of holding one long HTTP request open.
 app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
+  pruneFinishedJobs(videoJobs);
+  if (activeMediaJobId) {
+    await fs.promises.unlink(req.file.path).catch(() => {});
+    return res.status(409).json({ ok: false, error: "មានការងារវីដេអូមួយកំពុងដំណើរការ។ សូមរង់ចាំឱ្យវាចប់សិន មុនដាក់វីដេអូថ្មី។" });
+  }
   const id = randomUUID();
+  activeMediaJobId = id;
   const job = {
     id,
     status: "processing",
@@ -774,11 +806,15 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
       job.segmentCount = result.segments.length;
       job.stage = "completed";
       job.status = "completed";
+      job.finishedAt = Date.now();
+      if (activeMediaJobId === id) activeMediaJobId = null;
       console.log(`[VIDEO JOB] ${id} completed: ${built.size} bytes, ${result.segments.length} segments`);
     } catch (error) {
       job.status = "failed";
       job.stage = "failed";
       job.error = String(error?.message || "ដំណើរការវីដេអូមិនបាន");
+      job.finishedAt = Date.now();
+      if (activeMediaJobId === id) activeMediaJobId = null;
       await fs.promises.unlink(job.input).catch(() => {});
       if (job.work) await fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
       console.error(`[VIDEO JOB] ${id} failed:`, error);
@@ -789,6 +825,11 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
 // Multi-episode series: translate each episode in order, normalize it, then join into one MP4.
 app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
   const files = req.files || [];
+  pruneFinishedJobs(seriesJobs);
+  if (activeMediaJobId) {
+    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
+    return res.status(409).json({ ok: false, error: "មានការងារវីដេអូមួយកំពុងដំណើរការ។ សូមរង់ចាំឱ្យវាចប់សិន មុនដាក់រឿងភាគថ្មី។" });
+  }
   if (files.length < 2) {
     await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
     return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសយ៉ាងតិច ២ ភាគ" });
@@ -803,6 +844,7 @@ app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_
     return res.status(413).json({ ok: false, error: "ទំហំសរុបរឿងភាគលើស ១ GB។ សូមបង្រួមវីដេអូ ឬបញ្ចូលភាគតិចជាងនេះ។" });
   }
   const id = randomUUID();
+  activeMediaJobId = id;
   const work = path.join(TMP, "series-" + id);
   await fs.promises.mkdir(work, { recursive: true });
   const job = {
@@ -861,11 +903,15 @@ app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_
       job.size = stat.size;
       job.stage = "completed";
       job.status = "completed";
+      job.finishedAt = Date.now();
+      if (activeMediaJobId === id) activeMediaJobId = null;
       console.log(`[SERIES JOB] ${id} completed: ${files.length} episodes, ${stat.size} bytes`);
     } catch (error) {
       job.status = "failed";
       job.stage = "failed";
       job.error = String(error?.message || "បកប្រែរឿងភាគមិនបាន");
+      job.finishedAt = Date.now();
+      if (activeMediaJobId === id) activeMediaJobId = null;
       await Promise.all(job.inputFiles.map(file => fs.promises.unlink(file).catch(() => {})));
       await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
       console.error(`[SERIES JOB] ${id} failed:`, error);
@@ -969,14 +1015,20 @@ app.use((err, req, res, next) => {
   }
   console.error("[API ERROR]", err);
   const message = String(err?.message || "");
+  const quotaLimited = isQuotaOrRateLimitError(err);
+  const dailyQuota = quotaLimited && isDailyQuotaError(err);
   const temporary = isTemporaryGeminiError(err);
-  const status = temporary ? 503 : (Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500);
-  const khmerMessage = temporary
-    ? "សេវា AI កំពុងមមាញឹក ឬមានអ្នកប្រើច្រើន។ ប្រព័ន្ធបានសាកល្បងឡើងវិញ និងម៉ូដែលបម្រុងហើយ។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។"
-    : (/API key|permission|unauthorized|forbidden/i.test(message)
-      ? "ការភ្ជាប់ Gemini API Key មានបញ្ហា។ សូមពិនិត្យ GEMINI_API_KEY ក្នុង Render Environment។"
-      : message || "មានបញ្ហាក្នុងម៉ាស៊ីនមេ");
-  res.status(status).json({ ok: false, error: khmerMessage, retryable: temporary });
+  const status = quotaLimited ? 429 : (temporary ? 503 : (Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500));
+  const khmerMessage = quotaLimited
+    ? (dailyQuota
+      ? "កូតា Gemini ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ មុនពេលស្កេនវីដេអូម្ដងទៀត។"
+      : "Gemini បានកំណត់ចំនួនសំណើ (HTTP 429)។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។")
+    : (temporary
+      ? "សេវា AI កំពុងមមាញឹកជាបណ្ដោះអាសន្ន។ ប្រព័ន្ធបានសាកល្បងឡើងវិញតាមចំនួនកំណត់។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។"
+      : (/API key|permission|unauthorized|forbidden/i.test(message)
+        ? "ការភ្ជាប់ Gemini API Key មានបញ្ហា។ សូមពិនិត្យ GEMINI_API_KEY ក្នុង Render Environment។"
+        : message || "មានបញ្ហាក្នុងម៉ាស៊ីនមេ"));
+  res.status(status).json({ ok: false, error: khmerMessage, retryable: temporary || quotaLimited });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
