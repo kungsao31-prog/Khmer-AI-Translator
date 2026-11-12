@@ -238,12 +238,12 @@ function repairInvalidJsonEscapes(text) {
       inString = false;
       continue;
     }
-    if (ch !== "\\\\") {
+    if (ch !== "\\") {
       output += ch;
       continue;
     }
     const next = text[i + 1];
-    if (next && '"\\\\/bfnrt'.includes(next)) {
+    if (next && '"\\/bfnrt'.includes(next)) {
       output += ch + next;
       i++;
       continue;
@@ -254,7 +254,7 @@ function repairInvalidJsonEscapes(text) {
       continue;
     }
     // Invalid escape: encode the backslash itself; process the next char normally.
-    output += "\\\\\\\\";
+    output += "\\\\";
   }
   return output;
 }
