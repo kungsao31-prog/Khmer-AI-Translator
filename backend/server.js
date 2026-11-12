@@ -359,9 +359,31 @@ async function videoDuration(filePath) {
   if (!match) throw new Error("មិនអាចអានរយៈពេលវីដេអូបាន ឬឯកសារមិនមែនជាវីដេអូ");
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
+function extractSegmentArray(payload, depth = 0) {
+  if (depth > 5 || payload == null) return null;
+  if (Array.isArray(payload)) return payload;
+  if (typeof payload === "string") {
+    const value = payload.trim();
+    if (!value) return null;
+    try { return extractSegmentArray(JSON.parse(value), depth + 1); } catch (_) { return null; }
+  }
+  if (typeof payload !== "object") return null;
+  for (const key of ["segments", "subtitles", "captions", "items", "data", "result", "transcript"]) {
+    if (Object.prototype.hasOwnProperty.call(payload, key)) {
+      const found = extractSegmentArray(payload[key], depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function normalizeSegments(input, duration) {
-  if (!Array.isArray(input)) throw new Error("ទិន្នន័យ segments ត្រូវតែជា Array");
-  return input.map(item => ({
+  const segmentArray = extractSegmentArray(input);
+  if (!segmentArray) {
+    const received = input && typeof input === "object" ? Object.keys(input).join(", ") : typeof input;
+    throw new Error("AI មិនបានផ្ញើបញ្ជី segments ត្រឹមត្រូវទេ (ទទួលបាន: " + received + ")។ សូមសាកល្បងម្ដងទៀត។");
+  }
+  return segmentArray.map(item => ({
     start: Math.max(0, Number(item.start) || 0),
     end: Math.min(duration, Number(item.end) || 0),
     original: String(item.original || item.text || "").trim(),
