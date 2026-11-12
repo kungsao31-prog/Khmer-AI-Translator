@@ -45,7 +45,7 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash
   .split(",").map(value => value.trim()).filter(Boolean);
 const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
 const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
-const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 100));
+const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 200));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -379,7 +379,7 @@ function normalizeSegments(input, duration) {
     Number.isFinite(item.end) &&
     item.end > item.start &&
     item.start < duration
-  ).sort((a, b) => a.start - b.start).slice(0, 150);
+  ).sort((a, b) => a.start - b.start).slice(0, 600);
 }
 
 async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
@@ -393,7 +393,7 @@ async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
 - បកប្រែឱ្យទៅជាភាសាខ្មែរធម្មជាតិ ងាយស្តាប់។
 - start និង end ត្រូវជាពេលវេលាគិតជាវិនាទី (លេខទសភាគ) ហើយត្រូវសមស្របនឹងពេលសំឡេងនិយាយ។
 - កុំបង្កើតពាក្យដែលមិនមានក្នុងសំឡេង។
-- បែងចែកជាឃ្លាខ្លីៗ មិនឱ្យលើស 150 ផ្នែក។
+- បែងចែកជាឃ្លាខ្លីៗ មិនឱ្យលើស 600 ផ្នែក។
 - កំណត់ speakerId ឱ្យថេរសម្រាប់អ្នកនិយាយដដែល (ឧ. speaker-1, speaker-2)។
 - ប៉ាន់ស្មាន gender ជា male ឬ female តែបើសំឡេងអាចសម្គាល់បានច្បាស់; បើមិនច្បាស់ប្រើ unknown។
 - កំណត់ emotion តាមការនិយាយជា neutral, calm, sad, angry, excited, dramatic ឬ whisper។ កុំបន្ថែមអារម្មណ៍ដែលមិនឮជាក់ស្តែង។
@@ -467,7 +467,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // Two carefully staggered TTS workers shorten total wait time without
     // flooding the upstream voice service. Set EDGE_TTS_CONCURRENCY=1 to
     // force sequential processing if the provider starts returning HTTP 429.
-    const ttsConcurrency = Math.max(1, Math.min(3, Number(process.env.EDGE_TTS_CONCURRENCY || 3)));
+    const ttsConcurrency = Math.max(1, Math.min(3, Number(process.env.EDGE_TTS_CONCURRENCY || 1)));
     for (let offset = 0; offset < voiceJobs.length; offset += ttsConcurrency) {
       const batch = [];
       for (let index = offset; index < Math.min(offset + ttsConcurrency, voiceJobs.length); index++) {
