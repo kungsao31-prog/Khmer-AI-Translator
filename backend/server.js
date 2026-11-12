@@ -64,6 +64,13 @@ const upload = multer({
   dest: TMP,
   limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 1 }
 });
+const seriesUpload = multer({
+  dest: TMP,
+  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 20 }
+});
+const seriesJobs = new Map();
+const MAX_SERIES_FILES = 20;
+const MAX_SERIES_TOTAL_MB = 1024;
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -749,6 +756,125 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
     }
   });
 }));
+
+// Multi-episode series: translate each episode in order, normalize it, then join into one MP4.
+app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
+  const files = req.files || [];
+  if (files.length < 2) {
+    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
+    return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសយ៉ាងតិច ២ ភាគ" });
+  }
+  if (files.length > MAX_SERIES_FILES) {
+    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
+    return res.status(400).json({ ok: false, error: "អាចជ្រើសរើសបានអតិបរមា ២០ ភាគ" });
+  }
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > MAX_SERIES_TOTAL_MB * 1024 * 1024) {
+    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
+    return res.status(413).json({ ok: false, error: "ទំហំសរុបរឿងភាគលើស ១ GB។ សូមបង្រួមវីដេអូ ឬបញ្ចូលភាគតិចជាងនេះ។" });
+  }
+  const id = randomUUID();
+  const work = path.join(TMP, "series-" + id);
+  await fs.promises.mkdir(work, { recursive: true });
+  const job = {
+    id, status: "processing", stage: "queued", createdAt: Date.now(),
+    currentEpisode: 0, totalEpisodes: files.length, episodes: files.map(file => ({
+      name: path.basename(file.originalname || "episode.mp4"), status: "queued"
+    })),
+    inputFiles: files.map(file => file.path), output: null, work, size: 0, error: null
+  };
+  seriesJobs.set(id, job);
+  res.status(202).json({ ok: true, jobId: id, status: job.status, totalEpisodes: files.length });
+
+  setImmediate(async () => {
+    const normalizedFiles = [];
+    try {
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const episode = job.episodes[index];
+        job.currentEpisode = index + 1;
+        episode.status = "processing";
+        job.stage = "episode_" + (index + 1) + "_analyzing";
+        console.log(`[SERIES JOB] ${id}: analyzing episode ${index + 1}/${files.length} ${episode.name}`);
+        const result = await analyzeAndTranslateVideo(file.path, getMimeType(file), file.originalname);
+        if (!result.segments.length) throw new Error("ភាគ " + (index + 1) + " មិនមានសំឡេងនិយាយដែលអាចបកប្រែបាន");
+        job.stage = "episode_" + (index + 1) + "_creating_khmer_voice";
+        const built = await createDubbedVideo({ file, body: req.body }, null, result.segments, { returnFile: true });
+        const normalized = path.join(work, "episode-" + String(index + 1).padStart(2, "0") + ".mp4");
+        job.stage = "episode_" + (index + 1) + "_preparing_video";
+        await runFfmpeg([
+          "-y", "-i", built.output,
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1",
+          "-map", "0:v:0", "-map", "0:a:0",
+          "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25", "-threads", "1",
+          "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2",
+          "-movflags", "+faststart", normalized
+        ]);
+        normalizedFiles.push(normalized);
+        episode.status = "completed";
+        episode.duration = result.duration;
+        await fs.promises.unlink(file.path).catch(() => {});
+        await fs.promises.rm(built.work, { recursive: true, force: true }).catch(() => {});
+        console.log(`[SERIES JOB] ${id}: episode ${index + 1}/${files.length} completed`);
+      }
+
+      job.stage = "joining_all_episodes";
+      const concatList = path.join(work, "episodes.txt");
+      const listContent = normalizedFiles.map(file => "file '" + file.replace(/'/g, "'\\''") + "'").join("\n") + "\n";
+      await fs.promises.writeFile(concatList, listContent, "utf8");
+      job.output = path.join(work, "Khmer-Complete-Series.mp4");
+      await runFfmpeg([
+        "-y", "-f", "concat", "-safe", "0", "-i", concatList,
+        "-c", "copy", "-movflags", "+faststart", job.output
+      ]);
+      const stat = await fs.promises.stat(job.output);
+      if (!stat.size) throw new Error("មិនអាចបង្កើតវីដេអូរឿងភាគចុងក្រោយបាន");
+      job.size = stat.size;
+      job.stage = "completed";
+      job.status = "completed";
+      console.log(`[SERIES JOB] ${id} completed: ${files.length} episodes, ${stat.size} bytes`);
+    } catch (error) {
+      job.status = "failed";
+      job.stage = "failed";
+      job.error = String(error?.message || "បកប្រែរឿងភាគមិនបាន");
+      await Promise.all(job.inputFiles.map(file => fs.promises.unlink(file).catch(() => {})));
+      await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+      console.error(`[SERIES JOB] ${id} failed:`, error);
+    }
+  });
+}));
+
+app.get("/api/series/jobs/:id", (req, res) => {
+  const job = seriesJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
+  res.json({
+    ok: true, jobId: job.id, status: job.status, stage: job.stage,
+    currentEpisode: job.currentEpisode, totalEpisodes: job.totalEpisodes,
+    episodes: job.episodes, size: job.size || 0, error: job.error
+  });
+});
+
+app.get("/api/series/jobs/:id/download", (req, res) => {
+  const job = seriesJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
+  if (job.status !== "completed" || !job.output) {
+    return res.status(409).json({ ok: false, error: "រឿងភាគមិនទាន់ភ្ជាប់រួចរាល់ទេ" });
+  }
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Content-Length", String(job.size));
+  res.setHeader("Content-Disposition", 'attachment; filename="Khmer-Complete-Series.mp4"');
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(job.output, error => {
+    if (error) {
+      console.error("[SERIES JOB] Download failed:", error.message);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "ទាញយកវីដេអូរឿងភាគមិនបាន។ សូមសាកល្បងម្ដងទៀត។" });
+      else res.destroy(error);
+      return;
+    }
+    fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
+    seriesJobs.delete(job.id);
+  });
+});
 
 app.get("/api/video/jobs/:id", (req, res) => {
   const job = videoJobs.get(req.params.id);
