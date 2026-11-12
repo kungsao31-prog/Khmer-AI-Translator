@@ -91,6 +91,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     <button class="btn alt" id="downloadSrt">⬇ ទាញយកចំណងជើងរង SRT</button>
     <button class="btn" id="createDub">🎬 បង្កើតវីដេអូបញ្ចូលសំឡេងខ្មែរ</button>
   </div>
+  <div class="divider" style="height:1px;background:#28554b;margin:22px 0"></div>
+  <h3 style="font-size:16px;color:#72f1d1;margin:0 0 6px">🎞️ បកប្រែរឿងភាគច្រើនភាគ ហើយភ្ជាប់ជាវីដេអូតែមួយ</h3>
+  <p class="sub">ជ្រើសរើសភាគតាមលំដាប់ (២–២០ ភាគ)។ ប្រព័ន្ធនឹងបកប្រែម្តងមួយភាគ បន្ទាប់មកភ្ជាប់ជា MP4 តែមួយ។ ទំហំសរុបអតិបរមា ១ GB និងមួយភាគមិនលើស ២០០ MB។</p>
+  <div class="field"><label for="seriesFiles">ជ្រើសរើសឯកសារភាគច្រើន (តាមលំដាប់ដែលអ្នកជ្រើស)</label><input id="seriesFiles" type="file" accept="video/*" multiple></div>
+  <div class="status" id="seriesFileList">មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។</div>
+  <button class="btn" id="seriesStart">🎬 បកប្រែគ្រប់ភាគ និងភ្ជាប់ជា MP4 តែមួយ</button>
+  <div class="status" id="seriesStatus" role="status">សូមជ្រើសរើសវីដេអូ ២–២០ ភាគ រួចចុចប៊ូតុងខាងលើ។ កុំបិទកម្មវិធីរហូតដល់បញ្ចប់។</div>
   <div id="dubResult" class="hidden">
     <div class="status good" id="dubStatus">វីដេអូបកប្រែរួចរាល់។</div>
     <div class="result-video"><video id="dubPlayer" controls playsinline></video></div>
@@ -173,6 +180,77 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល URL");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");const r=await fetch(u+"/api/health",{method:"GET"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Backend មិនឆ្លើយតប");$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
   $("checkBackend").addEventListener("click",async()=>{try{await checkBackend()}catch(e){$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនអាចភ្ជាប់";setStatus("backendStatus","ភ្ជាប់មិនបាន៖ "+e.message,"error")}});
   async function ensureBackend(){if(!$("connectionDot").classList.contains("ok"))await checkBackend()}
+
+  let seriesBusy=false;
+  $("seriesFiles").addEventListener("change",()=>{
+    const files=Array.from($("seriesFiles").files||[]);
+    const total=files.reduce((sum,file)=>sum+file.size,0);
+    $("seriesFileList").textContent=files.length
+      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
+      : "មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។";
+  });
+  $("seriesStart").addEventListener("click",async()=>{
+    if(seriesBusy)return;
+    const files=Array.from($("seriesFiles").files||[]);
+    const total=files.reduce((sum,file)=>sum+file.size,0);
+    if(files.length<2||files.length>20){setStatus("seriesStatus","សូមជ្រើសរើសវីដេអូពី ២ ដល់ ២០ ភាគ។","error");return}
+    if(files.some(file=>file.size>200*1024*1024)){setStatus("seriesStatus","មានភាគមួយធំជាង ២០០ MB។ សូមបង្រួមឯកសារនោះជាមុន។","error");return}
+    if(total>1024*1024*1024){setStatus("seriesStatus","ទំហំសរុបលើស ១ GB។ សូមបញ្ចូលភាគតិចជាងនេះ ឬបង្រួមវីដេអូ។","error");return}
+    seriesBusy=true;$("seriesStart").disabled=true;startTimer();setProgress(0,"កំពុងរៀបចំរឿងភាគ...",false);
+    try{
+      await ensureBackend();
+      const form=new FormData();
+      files.forEach(file=>form.append("videos",file,file.name));
+      form.append("sourceLanguage",$("sourceLanguage").value);
+      form.append("gender",$("voiceGender").value);
+      setStatus("seriesStatus","កំពុងផ្ទុក "+files.length+" ភាគទៅ Backend...");
+      const jobId=await new Promise((resolve,reject)=>{
+        const xhr=new XMLHttpRequest();xhr.open("POST",apiUrl("/api/series/jobs"));xhr.responseType="json";xhr.timeout=30*60*1000;
+        xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);setProgress(p*0.15,"កំពុងផ្ទុករឿងភាគ "+p+"%",false)}};
+        xhr.onload=()=>{const data=xhr.response||{};if(xhr.status===202&&data.jobId)resolve(data.jobId);else reject(new Error(data.error||"មិនអាចចាប់ផ្ដើមការងាររឿងភាគបាន"))};
+        xhr.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញពេលផ្ទុករឿងភាគ"));
+        xhr.ontimeout=()=>reject(new Error("ការផ្ទុករឿងភាគចំណាយពេលលើស ៣០ នាទី"));
+        xhr.send(form);
+      });
+      setStatus("seriesStatus","ផ្ទុករួចហើយ។ កំពុងបកប្រែភាគនីមួយៗតាមលំដាប់...");
+      const started=Date.now();
+      let completedJob=null;
+      while(Date.now()-started<12*60*60*1000){
+        const response=await fetch(apiUrl("/api/series/jobs/"+encodeURIComponent(jobId)),{cache:"no-store"});
+        const job=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(job.error||"មិនអាចពិនិត្យស្ថានភាពរឿងភាគបាន");
+        const current=Number(job.currentEpisode)||0,totalEpisodes=Number(job.totalEpisodes)||files.length;
+        const pct=15+((current?current-1:0)/totalEpisodes)*70;
+        setProgress(pct,"កំពុងបកប្រែភាគ "+current+"/"+totalEpisodes+" · "+(job.stage||"processing"),true);
+        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\\n")||"កំពុងដំណើរការ...");
+        if(job.status==="failed")throw new Error(job.error||"បកប្រែរឿងភាគមិនបាន");
+        if(job.status==="completed"){completedJob=job;break}
+        await new Promise(resolve=>setTimeout(resolve,5000));
+      }
+      if(!completedJob)throw new Error("ការងាររឿងភាគចំណាយពេលលើស ១២ ម៉ោង។ សូមពិនិត្យ Backend ម្តងទៀត។");
+      setProgress(88,"គ្រប់ភាគរួចរាល់ · កំពុងទាញយក MP4...",false);
+      const download=await fetch(apiUrl("/api/series/jobs/"+encodeURIComponent(jobId)+"/download"));
+      if(!download.ok){const d=await download.json().catch(()=>({}));throw new Error(d.error||"ទាញយក MP4 រឿងភាគមិនបាន")}
+      const blob=await download.blob();
+      if(!blob||blob.size<1024)throw new Error("ឯកសារ MP4 ចុងក្រោយទទេ ឬមិនពេញលេញ");
+      if(dubUrl)URL.revokeObjectURL(dubUrl);
+      dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("dubResult").classList.remove("hidden");$("downloadDub").disabled=false;
+      setProgress(94,"MP4 រួចរាល់ · កំពុងរក្សាទុក...",false);
+      try{
+        const message=await saveBlobToPhone(blob,"Khmer-Complete-Series.mp4","video/mp4",p=>setProgress(94+p*.06,"កំពុងរក្សាទុក MP4 "+p+"%",false));
+        const stored=await saveLibraryFile("Khmer-Complete-Series.mp4",blob,"រឿងភាគខ្មែរភ្ជាប់រួច");
+        setProgress(100,"រួចរាល់ · 100%",false);
+        setStatus("seriesStatus","បកប្រែ "+files.length+" ភាគ និងភ្ជាប់ជា MP4 តែមួយរួចរាល់។ "+message+(stored?" បានរក្សាទុកក្នុងកម្មវិធីផងដែរ。":""),"good");
+      }catch(saveError){
+        setProgress(94,"MP4 រួចរាល់ · ត្រូវរក្សាទុកដោយដៃ",false);
+        setStatus("seriesStatus","បានបង្កើត MP4 រួច ប៉ុន្តែរក្សាទុកស្វ័យប្រវត្តិមិនបាន៖ "+saveError.message+"។ សូមចុច ទាញយក MP4 ម្ដងទៀត។","error");
+      }
+    }catch(error){
+      setStatus("seriesStatus","មានបញ្ហា៖ "+error.message,"error");
+    }finally{
+      stopTimer();seriesBusy=false;$("seriesStart").disabled=false;
+    }
+  });
   $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB) · ចាប់ផ្ដើមដំណើរការដោយស្វ័យប្រវត្តិ...";$("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");segments=[];processVideo(f)});
   $("originalVideo").addEventListener("loadedmetadata",()=>{$("videoDuration").textContent=fmt($("originalVideo").duration)});
   $("originalVideo").addEventListener("timeupdate",()=>{$("currentTime").textContent=fmt($("originalVideo").currentTime);const t=$("originalVideo").currentTime,s=segments.find(x=>t>=x.start&&t<x.end);$("subtitlePreview").textContent=s?(s.translation||s.khmer||""):""});
