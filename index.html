@@ -42,6 +42,47 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .library-item small{color:#9bbcb5;font-size:11px}
 .library-item button{border:1px solid #2a9e8b;border-radius:10px;background:#123d38;color:#dffff8;padding:7px 10px}
 @media(max-width:650px){.app{grid-template-columns:58px minmax(0,1fr);gap:7px;padding:7px}.rail{top:7px;height:calc(100dvh - 14px);min-height:500px;border-radius:20px;padding:9px 3px;gap:9px}.brand{width:44px;height:44px}.nav{width:49px;min-height:56px;border-radius:17px}.panel{padding:12px}.video-wrap video{max-height:48vh}.library-item{flex-wrap:wrap}.library-item .meta{min-width:65%}}
+
+/* Version 1.5 — portrait neon dubbing console inspired by the user's reference */
+body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 100%);padding-bottom:92px}
+.app{display:block;max-width:760px;min-height:100vh;padding:12px 12px 110px}
+.main{width:100%}
+.top{background:linear-gradient(110deg,#211b36,#101b29);border:1px solid #635a83;border-radius:22px;padding:12px 16px;box-shadow:0 0 22px #5d4aa633}
+.top h1{color:#e8e1ff;letter-spacing:.2px}
+.top p{color:#b9b2d7}
+.rail{position:fixed;z-index:20;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));top:auto;width:min(620px,calc(100% - 24px));height:76px;min-height:0;border-radius:28px;border:1.5px solid #8274a8;background:linear-gradient(100deg,#171827f5,#0b1522f5);box-shadow:0 0 22px #7164b955,inset 0 0 12px #ffffff0a;display:flex;flex-direction:row;justify-content:space-around;align-items:center;padding:7px 10px;gap:5px;backdrop-filter:blur(14px)}
+.rail .brand,.rail .spacer{display:none}
+.nav{flex:1;width:auto;min-width:0;min-height:54px;border-radius:18px;border:1px solid transparent;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:21px;padding:4px 2px;box-shadow:none}
+.nav small{font-size:9px;color:#b7b4c9}
+.nav.active{background:linear-gradient(120deg,#7af4e4,#44cbbb);border-color:#9efff3;color:#15333a;box-shadow:0 0 18px #53e9df77}
+.nav.active small{color:#174047;font-weight:800}
+.panel{border-radius:28px;border:1px solid #657b83;background:linear-gradient(150deg,#222b31,#111c25);box-shadow:0 18px 48px #0008;padding:17px}
+.panel h2{color:#79f5eb}
+.panel.active{animation:panelIn .22s ease-out}
+@keyframes panelIn{from{opacity:.7;transform:translateY(5px)}to{opacity:1;transform:none}}
+.video-wrap{width:min(100%,390px);aspect-ratio:9/16;max-height:64vh;margin:16px auto 8px;border:2px solid #37f0e7;border-radius:24px;background:#090b20;box-shadow:0 0 20px #19e9e077;display:flex;align-items:center;justify-content:center}
+.video-wrap video{width:100%;height:100%;max-height:none;object-fit:contain}
+.preview-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;color:#c8baff;font-weight:800;font-size:17px;pointer-events:none}
+.video-wrap:has(video[src]) .preview-placeholder{display:none}
+.video-wrap .subtitle{z-index:2;bottom:12%;font-size:18px}
+.time-row{color:#d1d3e7}
+.progress{background:#293344;border:1px solid #3b5360}
+.progress>i{background:linear-gradient(90deg,#36eacb,#44c9ff)}
+.btn{border-radius:22px;background:linear-gradient(110deg,#16cba9,#1765b8);border-color:#58f8e5;box-shadow:0 0 16px #1bd7c044}
+.btn.video-action{border-radius:24px;background:linear-gradient(110deg,#332a92,#211d68);border-color:#5149bc;box-shadow:0 0 18px #3933aa66}
+.field input,.field select,.field textarea{background:#101827;border-color:#455c70}
+.status{background:#101b29;border-color:#425d70}
+@media(max-width:650px){
+ .app{padding:8px 8px 108px}
+ .rail{width:calc(100% - 22px);height:72px;bottom:max(10px,env(safe-area-inset-bottom));border-radius:25px;padding:6px 8px}
+ .nav{min-height:52px;border-radius:17px;font-size:20px}
+ .nav small{font-size:8px}
+ .panel{padding:13px;border-radius:23px}
+ .video-wrap{width:min(100%,360px);max-height:62vh}
+ .video-wrap video{max-height:none}
+ .top{padding:10px 12px}
+}
+
 </style>
 </head>
 <body>
@@ -80,7 +121,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     </select></div>
     <div class="field"><label for="voiceGender">សំឡេងខ្មែរ</label><select id="voiceGender"><option value="female">សំឡេងស្រី</option><option value="male">សំឡេងប្រុស</option></select></div>
   </div>
-  <div class="video-wrap hidden" id="originalWrap"><video id="originalVideo" controls playsinline></video><div class="subtitle" id="subtitlePreview"></div></div>
+  <div class="video-wrap" id="originalWrap"><video id="originalVideo" controls playsinline></video><div class="preview-placeholder" id="previewPlaceholder">9:16 Video Preview<br>ជ្រើសរើសវីដេអូ ដើម្បីមើល Preview</div><div class="subtitle" id="subtitlePreview"></div></div>
   <div class="time-row"><span id="currentTime">00:00</span><span id="videoDuration">--:--</span></div>
   <div class="field"><label for="scanProgress">ភាគរយដំណើរការបកប្រែវីដេអូ</label><div class="progress" id="progressTrack"><i id="progressBar"></i></div><div class="time-row"><span id="progressLabel">ត្រៀមរួចរាល់</span><strong id="progressPercent">0%</strong><span id="elapsedTime">00:00</span></div></div>
   <button class="btn video-action" id="translateVideo">🎬 បកប្រែវីដេអូជាភាសាខ្មែរ</button>
@@ -251,7 +292,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
       stopTimer();seriesBusy=false;$("seriesStart").disabled=false;
     }
   });
-  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB)។ សូមចុចប៊ូតុង «បកប្រែវីដេអូជាភាសាខ្មែរ» ខាងក្រោម ដើម្បីចាប់ផ្ដើម។";$("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");setProgress(0,"ត្រៀមរួចរាល់ · ចុចប៊ូតុងបកប្រែ",false);segments=[]});
+  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("previewPlaceholder").classList.add("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB)។ សូមចុចប៊ូតុង «បកប្រែវីដេអូជាភាសាខ្មែរ» ខាងក្រោម ដើម្បីចាប់ផ្ដើម។";$("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");setProgress(0,"ត្រៀមរួចរាល់ · ចុចប៊ូតុងបកប្រែ",false);segments=[]});
   $("originalVideo").addEventListener("loadedmetadata",()=>{$("videoDuration").textContent=fmt($("originalVideo").duration)});
   $("originalVideo").addEventListener("timeupdate",()=>{$("currentTime").textContent=fmt($("originalVideo").currentTime);const t=$("originalVideo").currentTime,s=segments.find(x=>t>=x.start&&t<x.end);$("subtitlePreview").textContent=s?(s.translation||s.khmer||""):""});
   function xhrUpload(path,form,onProgress){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl(path));x.responseType="json";x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};x.onload=()=>{let d=x.response;if(!d&&x.responseText){try{d=JSON.parse(x.responseText)}catch(_){}}if(x.status>=200&&x.status<300)resolve(d||{});else reject(new Error((d&&d.error)||("Server error "+x.status)))};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));x.onabort=()=>reject(new Error("បានបោះបង់ការផ្ទុក"));x.send(form)})}
