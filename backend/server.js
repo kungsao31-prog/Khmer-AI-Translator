@@ -724,13 +724,15 @@ async function createDubbedVideo(req, res, segments, options = {}) {
   }
 }
 
-// Basic routes
+// Serve the actual mobile web app at the service root.
+// Keep the health endpoint separate so opening the Render URL shows the UI,
+// while monitoring systems can continue checking /api/health.
 app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    name: "Khmer AI Translator Pro",
-    version: "3.0.0",
-    health: "/api/health"
+  res.sendFile(path.join(__dirname, "..", "index.html"), error => {
+    if (error && !res.headersSent) {
+      console.error("[WEB] Could not serve index.html:", error.message);
+      res.status(500).send("Khmer AI Translator Pro frontend is unavailable.");
+    }
   });
 });
 
