@@ -16,10 +16,10 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .rail .spacer{flex:1}.main{min-width:0}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 3px 14px}.top h1{font-size:21px;margin:0}.top p{font-size:12px;color:var(--muted);margin:2px 0}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #2d6257;background:#0e2925;border-radius:99px;padding:7px 11px;font-size:11px;color:#b8f9e5}.dot{width:8px;height:8px;border-radius:50%;background:#ffc65b;display:inline-block}.dot.ok{background:#16e6a8;box-shadow:0 0 8px #16e6a8}
 .panel{display:none;background:linear-gradient(155deg,#102825,#0b1d1c);border:1px solid #28554b;border-radius:24px;padding:18px;margin-bottom:14px;box-shadow:0 15px 40px #0003}.panel.active{display:block}.panel h2{font-size:18px;margin:0 0 5px;color:#66f2d0}.sub{font-size:12px;color:var(--muted);margin:0 0 15px}
 .field{margin:12px 0}.field label{display:block;font-size:13px;color:#cce9e2;margin:0 0 6px}.field input,.field select,.field textarea{width:100%;background:#071b1a;border:1px solid #315c54;color:var(--text);border-radius:12px;padding:12px;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--mint);box-shadow:0 0 0 2px #19e6b022}.field textarea{min-height:112px;resize:vertical}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{border:1px solid #1ce2b4;background:linear-gradient(120deg,#0bbd94,#087d7a);color:#fff;border-radius:13px;padding:12px 15px;font-weight:750;width:100%;margin-top:8px}.btn.alt{background:#132e2b;border-color:#3b7166;color:#d7fff5}.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{border:1px solid #1ce2b4;background:linear-gradient(120deg,#0bbd94,#087d7a);color:#fff;border-radius:13px;padding:12px 15px;font-weight:750;width:100%;margin-top:8px}.btn.alt{background:#132e2b;border-color:#3b7166;color:#d7fff5}.btn.video-action{font-size:17px;padding:16px 14px;margin-top:12px;background:linear-gradient(120deg,#00c995,#087dba);border:2px solid #70ffe0;box-shadow:0 0 18px #00d9ad44}.btn:disabled{opacity:.45;cursor:not-allowed}
 .note{font-size:11px;color:var(--muted);margin:7px 0}.status{border:1px solid #315d52;background:#071b19;border-radius:13px;padding:11px;margin-top:12px;color:#b8f8e5;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}.status.error{border-color:#874c4c;color:#ffc3c3}.status.good{border-color:#168e6d;color:#a8ffe3}
 .video-wrap{background:#020a09;border:1px solid #27645b;border-radius:19px;overflow:hidden;margin-top:12px;position:relative}.video-wrap video{width:100%;max-height:470px;display:block;background:#000}.subtitle{position:absolute;left:5%;right:5%;bottom:12%;text-align:center;color:white;font-weight:800;font-size:22px;line-height:1.45;text-shadow:0 2px 5px #000;background:#0008;padding:5px 9px;border-radius:8px;pointer-events:none}
-.time-row{display:flex;justify-content:space-between;color:#b4d7ce;font-size:12px;padding:8px 2px}.progress{height:7px;background:#203b36;border-radius:99px;overflow:hidden;margin-top:8px}.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#13d6a3,#2ad5f0);transition:width .2s}.progress.indeterminate>i{width:35%;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
+.time-row{display:flex;justify-content:space-between;color:#b4d7ce;font-size:12px;padding:8px 2px}.progress{height:12px;background:#203b36;border-radius:99px;overflow:hidden;margin-top:8px}.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#13d6a3,#2ad5f0);transition:width .2s}.progress.indeterminate>i{width:35%;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
 .segment-list{max-height:300px;overflow:auto;border:1px solid #294f47;border-radius:12px;margin-top:12px}.segment{padding:10px 12px;border-bottom:1px solid #24463f;font-size:13px}.segment:last-child{border:0}.segment time{display:block;color:#5de7c2;font-size:11px;margin-bottom:4px}.segment .original{color:#9dbdb5;font-size:11px}
 .result-video{margin-top:12px}.result-video video{width:100%;border-radius:14px;background:#000}
 .hidden{display:none!important}.foot{text-align:center;color:#789d93;font-size:11px;padding:18px 4px}
@@ -82,8 +82,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   </div>
   <div class="video-wrap hidden" id="originalWrap"><video id="originalVideo" controls playsinline></video><div class="subtitle" id="subtitlePreview"></div></div>
   <div class="time-row"><span id="currentTime">00:00</span><span id="videoDuration">--:--</span></div>
-  <div class="field"><label for="scanProgress">ដំណើរការស្វ័យប្រវត្តិ</label><div class="progress" id="progressTrack"><i id="progressBar"></i></div><div class="time-row"><span id="progressLabel">មិនទាន់ចាប់ផ្ដើម</span><strong id="progressPercent">0%</strong><span id="elapsedTime">00:00</span></div></div>
-  <button class="btn alt" id="scanVideo">↻ ដំណើរការវីដេអូម្ដងទៀត</button>
+  <div class="field"><label for="scanProgress">ភាគរយដំណើរការបកប្រែវីដេអូ</label><div class="progress" id="progressTrack"><i id="progressBar"></i></div><div class="time-row"><span id="progressLabel">ត្រៀមរួចរាល់</span><strong id="progressPercent">0%</strong><span id="elapsedTime">00:00</span></div></div>
+  <button class="btn video-action" id="translateVideo">🎬 បកប្រែវីដេអូជាភាសាខ្មែរ</button>
   <div class="status" id="videoStatus" role="status">ជ្រើសរើសវីដេអូ ដើម្បីផ្ទុក បកប្រែ បង្កើត និងរក្សាទុក MP4 ដោយស្វ័យប្រវត្តិ។</div>
   <div id="segmentsArea" class="hidden">
     <h3 style="font-size:15px;color:#72f1d1;margin:18px 0 5px">លទ្ធផលស្គាល់សំឡេង និងពេលវេលា</h3>
@@ -251,7 +251,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
       stopTimer();seriesBusy=false;$("seriesStart").disabled=false;
     }
   });
-  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB) · ចាប់ផ្ដើមដំណើរការដោយស្វ័យប្រវត្តិ...";$("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");segments=[];processVideo(f)});
+  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB)។ សូមចុចប៊ូតុង «បកប្រែវីដេអូជាភាសាខ្មែរ» ខាងក្រោម ដើម្បីចាប់ផ្ដើម។";$("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");setProgress(0,"ត្រៀមរួចរាល់ · ចុចប៊ូតុងបកប្រែ",false);segments=[]});
   $("originalVideo").addEventListener("loadedmetadata",()=>{$("videoDuration").textContent=fmt($("originalVideo").duration)});
   $("originalVideo").addEventListener("timeupdate",()=>{$("currentTime").textContent=fmt($("originalVideo").currentTime);const t=$("originalVideo").currentTime,s=segments.find(x=>t>=x.start&&t<x.end);$("subtitlePreview").textContent=s?(s.translation||s.khmer||""):""});
   function xhrUpload(path,form,onProgress){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl(path));x.responseType="json";x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};x.onload=()=>{let d=x.response;if(!d&&x.responseText){try{d=JSON.parse(x.responseText)}catch(_){}}if(x.status>=200&&x.status<300)resolve(d||{});else reject(new Error((d&&d.error)||("Server error "+x.status)))};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));x.onabort=()=>reject(new Error("បានបោះបង់ការផ្ទុក"));x.send(form)})}
@@ -314,7 +314,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     if(isVideoProcessing)return;
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
     if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}
-    isVideoProcessing=true;stopEstimate();$("scanVideo").disabled=true;$("downloadDub").disabled=true;
+    isVideoProcessing=true;stopEstimate();$("translateVideo").disabled=true;$("downloadDub").disabled=true;
     $("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");$("dubPlayer").removeAttribute("src");
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
     setProgress(0,"កំពុងរៀបចំវីដេអូ...",false);setStatus("dubStatus","កំពុងត្រៀមផ្ទុកវីដេអូទៅ Backend...");
@@ -335,9 +335,9 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
         setStatus("videoStatus","បកប្រែ និងទាញយក MP4 ដោយស្វ័យប្រវត្តិរួចរាល់។","good");
       }catch(saveError){setProgress(94,"MP4 រួចរាល់ · ត្រូវរក្សាទុកដោយដៃ",false);setStatus("dubStatus","MP4 បានបង្កើតរួចហើយ ប៉ុន្តែរក្សាទុកស្វ័យប្រវត្តិមិនបាន៖ "+saveError.message+"។ សូមចុចប៊ូតុង ទាញយក MP4 ម្ដងទៀត។","error")}
     }catch(e){stopEstimate();setStatus("videoStatus","មានបញ្ហា៖ "+e.message,"error");setStatus("dubStatus","ដំណើរការមិនបាន៖ "+e.message,"error");setProgress(0,"បរាជ័យ · សូមសាកល្បងម្ដងទៀត",false)}
-    finally{stopEstimate();stopTimer();isVideoProcessing=false;$("scanVideo").disabled=false}
+    finally{stopEstimate();stopTimer();isVideoProcessing=false;$("translateVideo").disabled=false}
   }
-  $("scanVideo").addEventListener("click",()=>processVideo($("videoFile").files[0]));
+  $("translateVideo").addEventListener("click",()=>processVideo($("videoFile").files[0]));
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
   $("downloadSrt").addEventListener("click",async()=>{if(!segments.length)return;const content=segments.map((s,i)=>(i+1)+"\n"+srtTime(s.start)+" --> "+srtTime(s.end)+"\n"+s.translation).join("\n\n")+"\n";const blob=new Blob(["\uFEFF"+content],{type:"text/plain;charset=utf-8"});downloadBlob(blob,"Khmer-Subtitles.srt");await saveLibraryFile("Khmer-Subtitles.srt",blob,"SRT")});
   $("downloadDub").addEventListener("click",async()=>{if(!dubBlob)return;const button=$("downloadDub");button.disabled=true;try{const message=await saveBlobToPhone(dubBlob,"Khmer-AI-Translated-Video.mp4","video/mp4",p=>setStatus("dubStatus","កំពុងរក្សាទុក MP4 ក្នុងទូរសព្ទ "+p+"%..."));const stored=await saveLibraryFile("Khmer-AI-Translated-Video.mp4",dubBlob,"វីដេអូ MP4");setStatus("dubStatus",message+(stored?"\nបានរក្សាទុកច្បាប់ចម្លងក្នុងកម្មវិធីផងដែរ។":""),"good")}catch(e){setStatus("dubStatus","រក្សាទុកវីដេអូមិនបាន៖ "+e.message,"error")}finally{button.disabled=false}});
@@ -345,7 +345,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();audioBlob=blob;if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
   $("downloadAudio").addEventListener("click",async()=>{if(audioBlob){downloadBlob(audioBlob,"Khmer-Voice.mp3");await saveLibraryFile("Khmer-Voice.mp3",audioBlob,"សំឡេង MP3")}});
   renderLibrary();
-  checkBackend().catch(()=>{});
+  checkBackend().catch(e=>{$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនទាន់ភ្ជាប់";setStatus("backendStatus","មិនទាន់ភ្ជាប់៖ "+e.message+"។ សូមចុច «រក្សាទុក និងពិនិត្យការភ្ជាប់»។","error")});
 })();
 </script>
 </body>
