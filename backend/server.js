@@ -50,7 +50,10 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash
   .split(",").map(value => value.trim()).filter(Boolean);
 const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
 const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
-const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 200));
+const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 1024));
+const VIDEO_CHUNK_SECONDS = Math.max(120, Math.min(1800, Number(process.env.VIDEO_CHUNK_SECONDS || 600)));
+const MAX_VIDEO_DURATION_SECONDS = Math.max(600, Math.min(10800, Number(process.env.MAX_VIDEO_DURATION_SECONDS || 10800)));
+const MAX_VIDEO_SEGMENTS = Math.max(600, Math.min(12000, Number(process.env.MAX_VIDEO_SEGMENTS || 6000)));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -501,50 +504,58 @@ function normalizeSegments(input, duration) {
     Number.isFinite(item.end) &&
     item.end > item.start &&
     item.start < duration
-  ).sort((a, b) => a.start - b.start).slice(0, 600);
+  ).sort((a, b) => a.start - b.start).slice(0, MAX_VIDEO_SEGMENTS);
 }
 
-async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
+async function analyzeVideoChunk(filePath, mimeType, originalName) {
   const file = await uploadGeminiFile(filePath, mimeType, originalName || "uploaded-video");
   try {
-    const prompt = `
-អ្នកជាអ្នកបកប្រែ និងរៀបចំសំឡេងវីដេអូពីភាសាបរទេសទៅជាភាសាខ្មែរ។
-សូមស្តាប់សំឡេងនិយាយក្នុងវីដេអូនេះ ហើយបង្កើតអត្ថបទជាផ្នែកៗតាមលំដាប់ពេលវេលា។
-- ស្គាល់ភាសាដើមដោយស្វ័យប្រវត្តិ។
-- ចម្លងអត្ថបទដើមឱ្យបានត្រឹមត្រូវតាមដែលអាចធ្វើបាន។
-- បកប្រែឱ្យទៅជាភាសាខ្មែរធម្មជាតិ ងាយស្តាប់។
-- start និង end ត្រូវជាពេលវេលាគិតជាវិនាទី (លេខទសភាគ) ដោយស្តាប់សំឡេង និងពិនិត្យចលនាបបូរមាត់ក្នុងរូបភាពជាមួយគ្នា។
-- start ត្រូវចាប់ពីពេលមាត់តួអង្គចាប់ផ្តើមនិយាយ ឬចាប់ផ្តើមចលនាដែលបង្ហាញថាកំពុងនិយាយ; កុំដាក់ start យឺតក្រោយចលនាមាត់។
-- end ត្រូវបញ្ចប់នៅពេលការនិយាយ និងចលនាមាត់ឈប់; កុំឱ្យពេលវេលាឃ្លាមួយរអិលទៅឃ្លាបន្ទាប់។
-- ប្រើសំឡេងជាគោល ហើយប្រើចលនាបបូរមាត់ជាភស្តុតាងជួយកែតម្រូវពេលវេលា; កុំប្រើកាយវិការទូទៅដែលមិនមែនជាការនិយាយដើម្បីកំណត់ពេលសំឡេង។
-- កុំបង្កើតពាក្យដែលមិនមានក្នុងសំឡេង។
-- បែងចែកជាឃ្លាខ្លីៗ មិនឱ្យលើស 600 ផ្នែក។
-- កំណត់ speakerId ឱ្យថេរសម្រាប់អ្នកនិយាយដដែល (ឧ. speaker-1, speaker-2)។
-- ប៉ាន់ស្មាន gender ជា male ឬ female តែបើសំឡេងអាចសម្គាល់បានច្បាស់; បើមិនច្បាស់ប្រើ unknown។
-- កំណត់ emotion តាមការនិយាយជា neutral, calm, sad, angry, excited, dramatic ឬ whisper។ កុំបន្ថែមអារម្មណ៍ដែលមិនឮជាក់ស្តែង។
-- បើមិនមានសំឡេងនិយាយ សូមត្រឡប់ segments ជា Array ទទេ។
-សូមឆ្លើយតែ JSON តាមទម្រង់នេះ មិនត្រូវដាក់ Markdown ឬ code fence៖
-{"sourceLanguage":"English","segments":[{"start":0.0,"end":2.5,"speakerId":"speaker-1","gender":"male","emotion":"dramatic","original":"Hello","translation":"សួស្តី"}]}
-`;
-    const raw = await geminiGenerate(VIDEO_MODEL, [{
-      role: "user",
-      parts: [
-        { fileData: { mimeType, fileUri: file.uri } },
-        { text: prompt }
-      ]
-    }], { responseMimeType: "application/json", temperature: 0.1 });
-
+    const prompt = "អ្នកជាអ្នកបកប្រែវីដេអូទៅជាភាសាខ្មែរ។ សូមស្តាប់សំឡេងនិយាយ និងបង្កើត segments តាមលំដាប់ពេលវេលា។\n" +
+      "- ស្គាល់ភាសាដើមដោយស្វ័យប្រវត្តិ និងបកប្រែជាភាសាខ្មែរធម្មជាតិ។\n" +
+      "- start/end ជាវិនាទីគិតពីដើមឃ្លីបនេះ មិនមែនពីដើមវីដេអូទាំងមូល។\n" +
+      "- ប្រើសំឡេងជាគោល និងចលនាបបូរមាត់ជាភស្តុតាងជួយកំណត់ពេលវេលា។ កុំបង្កើតពាក្យ ឬពេលវេលា។\n" +
+      "- បែងចែកជាឃ្លាខ្លីៗ មិនឱ្យលើស 600 ផ្នែកក្នុងឃ្លីបនេះ។\n" +
+      "- រក្សា speakerId ឱ្យថេរ; gender ជា male/female តែពេលសម្គាល់ច្បាស់; emotion ជា neutral/calm/sad/angry/excited/dramatic/whisper។\n" +
+      "- បើគ្មានសំឡេងនិយាយ សូមត្រឡប់ segments ជា Array ទទេ។\n" +
+      "ឆ្លើយតែ JSON៖ {\"sourceLanguage\":\"English\",\"segments\":[{\"start\":0.0,\"end\":2.5,\"speakerId\":\"speaker-1\",\"gender\":\"male\",\"emotion\":\"neutral\",\"original\":\"Hello\",\"translation\":\"សួស្តី\"}]}";
+    const raw = await geminiGenerate(VIDEO_MODEL, [{ role:"user", parts:[
+      { fileData:{ mimeType, fileUri:file.uri } }, { text:prompt }
+    ]}], { responseMimeType:"application/json", temperature:0.1 });
     const parsed = parseJsonObject(raw);
     const duration = await videoDuration(filePath);
-    const segments = normalizeSegments(parsed, duration);
-    return {
-      sourceLanguage: String(parsed.sourceLanguage || "unknown"),
-      duration,
-      segments
-    };
-  } finally {
-    await deleteGeminiFile(file.name);
+    return { sourceLanguage:String(parsed.sourceLanguage||"unknown"), duration, segments:normalizeSegments(parsed,duration) };
+  } finally { await deleteGeminiFile(file.name); }
+}
+
+async function analyzeAndTranslateVideo(filePath, mimeType, originalName, onProgress) {
+  const duration = await videoDuration(filePath);
+  if (duration > MAX_VIDEO_DURATION_SECONDS) throw new Error("វីដេអូវែងជាងកម្រិតអតិបរមា 3 ម៉ោង។ សូមបំបែកវីដេអូជាផ្នែកៗ។");
+  if (duration <= VIDEO_CHUNK_SECONDS) {
+    if (onProgress) onProgress({ progress:100, stage:"analyzing_video" });
+    return analyzeVideoChunk(filePath,mimeType,originalName);
   }
+  const work = path.join(TMP,"analysis-"+randomUUID());
+  await fs.promises.mkdir(work,{recursive:true});
+  const combined=[];
+  let sourceLanguage="unknown";
+  const totalChunks=Math.ceil(duration/VIDEO_CHUNK_SECONDS);
+  try {
+    for(let index=0;index<totalChunks;index++){
+      const offset=index*VIDEO_CHUNK_SECONDS;
+      const chunkDuration=Math.min(VIDEO_CHUNK_SECONDS,duration-offset);
+      const chunkPath=path.join(work,"chunk-"+String(index+1).padStart(3,"0")+".mp4");
+      const stage="analyzing_chunk_"+(index+1)+"_of_"+totalChunks;
+      if(onProgress)onProgress({progress:Math.round(index/totalChunks*100),stage});
+      await runFfmpeg(["-y","-ss",String(offset),"-i",filePath,"-t",String(chunkDuration),
+        "-map","0:v:0","-map","0:a:0?","-c","copy","-avoid_negative_ts","make_zero",chunkPath]);
+      const chunk=await analyzeVideoChunk(chunkPath,"video/mp4",(originalName||"video")+"-part-"+(index+1));
+      if(sourceLanguage==="unknown"&&chunk.sourceLanguage!=="unknown")sourceLanguage=chunk.sourceLanguage;
+      for(const segment of chunk.segments)combined.push({...segment,start:segment.start+offset,end:segment.end+offset});
+      if(onProgress)onProgress({progress:Math.round((index+1)/totalChunks*100),stage});
+      console.log("[VIDEO ANALYSIS] chunk "+(index+1)+"/"+totalChunks+" completed; "+chunk.segments.length+" segments");
+    }
+    return {sourceLanguage,duration,segments:combined.sort((a,b)=>a.start-b.start).slice(0,MAX_VIDEO_SEGMENTS)};
+  } finally { await fs.promises.rm(work,{recursive:true,force:true}).catch(()=>{}); }
 }
 
 async function createDubbedVideo(req, res, segments, options = {}) {
@@ -846,7 +857,8 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
     work: null,
     input: req.file.path,
     error: null,
-    size: 0
+    size: 0,
+    progress: 0
   };
   videoJobs.set(id, job);
   res.status(202).json({ ok: true, jobId: id, status: job.status });
@@ -857,10 +869,12 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
       const result = await analyzeAndTranslateVideo(
         req.file.path,
         getMimeType(req.file),
-        req.file.originalname
+        req.file.originalname,
+        update => { job.progress = Math.min(100, Math.max(0, Number(update.progress) || 0)); job.stage = update.stage; }
       );
       if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
       job.stage = "creating_khmer_voice_and_mp4";
+      job.progress = 100;
       const built = await createDubbedVideo(req, null, result.segments, { returnFile: true });
       job.output = built.output;
       job.work = built.work;
@@ -1025,7 +1039,8 @@ app.get("/api/video/jobs/:id", (req, res) => {
     error: job.error,
     size: job.size || 0,
     duration: job.duration || 0,
-    segmentCount: job.segmentCount || 0
+    segmentCount: job.segmentCount || 0,
+    progress: job.progress || 0
   });
 });
 
