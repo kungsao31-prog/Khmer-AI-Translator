@@ -200,11 +200,14 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
         completed=true;
         break;
       }
-      const stage=state.stage==="analyzing_video"
-        ?"AI កំពុងស្គេន និងបកប្រែវីដេអូ"
-        :state.stage==="creating_khmer_voice_and_mp4"
-          ?"កំពុងបង្កើតសំឡេងខ្មែរ និង MP4"
-          :"កំពុងរៀបចំការងារ";
+      const stage=String(state.stage||"").startsWith("analyzing_chunk_")
+        ?"AI កំពុងស្គេន និងបកប្រែផ្នែកវីដេអូ ("+state.stage.replace("analyzing_chunk_","").replaceAll("_of_","/")+")"
+        :state.stage==="analyzing_video"
+          ?"AI កំពុងស្គេន និងបកប្រែវីដេអូ"
+          :state.stage==="creating_khmer_voice_and_mp4"
+            ?"កំពុងបង្កើតសំឡេងខ្មែរ និង MP4"
+            :"កំពុងរៀបចំការងារ";
+      if(String(state.stage||"").startsWith("analyzing_chunk_"))setProgress(18+(Math.max(0,Math.min(100,Number(state.progress)||0))*.64),stage,false);
       setStatus("videoStatus",stage+"។ សូមកុំបិទកម្មវិធី។");
     }
     if(!completed)throw new Error("ការងារចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យស្ថានភាព Backend មុនសាកល្បងម្ដងទៀត។");
@@ -221,7 +224,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   async function processVideo(file){
     if(isVideoProcessing)return;
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
-    if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}
+    if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB នៅលើ Server បច្ចុប្បន្ន។","error");return}
     isVideoProcessing=true;stopEstimate();$("scanVideo").disabled=true;$("downloadDub").disabled=true;
     $("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");$("dubPlayer").removeAttribute("src");$("dubStatus").textContent="កំពុងដំណើរការ...";$("dubStatus").className="status";
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
