@@ -334,8 +334,16 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
               download.send();return;
             }
             if(Date.now()-started>3*60*60*1000){reject(new Error("ការបកប្រែចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យសេវាកម្ម Backend។"));return}
-            setProgress(18,"AI កំពុងធ្វើការ · "+(job.stage||"processing"),true);
-            setStatus("videoStatus","AI កំពុងបកប្រែសំឡេងខ្មែរ។ សូមកុំបិទទំព័រ...");
+            const stage=String(job.stage||"");
+            if(stage.startsWith("analyzing_chunk_")){
+              const part=stage.slice("analyzing_chunk_".length).replace("_of_","/");
+              const progress=Math.max(0,Math.min(100,Number(job.progress)||0));
+              setProgress(18+progress*.64,"AI កំពុងស្គេនវីដេអូផ្នែក "+part+" · "+Math.round(progress)+"%",false);
+              setStatus("videoStatus","AI កំពុងស្គេន និងបកប្រែវីដេអូជាផ្នែកៗ។ សូមកុំបិទកម្មវិធី...");
+            }else{
+              setProgress(82,"កំពុងបង្កើតសំឡេងខ្មែរ និង MP4",true);
+              setStatus("videoStatus","AI កំពុងបង្កើតសំឡេងខ្មែរ និងរៀបចំ MP4។ សូមកុំបិទកម្មវិធី...");
+            }
             setTimeout(poll,4000);
           }catch(error){
             failures++;
