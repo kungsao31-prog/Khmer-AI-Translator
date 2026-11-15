@@ -658,14 +658,14 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       const tempo = Math.max(1, Math.min(2, generatedDuration / targetDuration));
       filters.push(
         `[${index + 2}:a]atempo=${tempo.toFixed(4)},` +
-        `loudnorm=I=-16:TP=-1.5:LRA=11,apad,atrim=duration=${targetDuration.toFixed(3)},` +
-        `adelay=${delay}|${delay},volume=1.15[${label}]`
+        `volume=1.15,apad,atrim=duration=${targetDuration.toFixed(3)},` +
+        `adelay=${delay}|${delay}[${label}]`
       );
       mixInputs.push(`[${label}]`);
     }
 
     filters.push(
-      `${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0,` +
+      `${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0:normalize=0,` +
       "loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95[aout]"
     );
 
