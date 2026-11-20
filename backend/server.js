@@ -505,17 +505,17 @@ function normalizeSegments(input, duration) {
 }
 
 async function translateSubtitleSrt(source) {
-  const normalized = String(source || "").replace(/^\\uFEFF/, "").replace(/\\r/g, "");
-  const blocks = normalized.split(/\\n\\s*\\n/).map(block => block.trim()).filter(Boolean);
+  const normalized = String(source || "").replace(/^\uFEFF/, "").replace(/\r/g, "");
+  const blocks = normalized.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
   const cues = [];
   for (const block of blocks) {
-    const lines = block.split("\\n");
-    const timeIndex = lines.findIndex(line => /\\d{2}:\\d{2}:\\d{2}[,.]\\d{3}\\s*-->/.test(line));
+    const lines = block.split("\n");
+    const timeIndex = lines.findIndex(line => /\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->/.test(line));
     if (timeIndex < 0) continue;
-    const timing = lines[timeIndex].replace(/\\.(\\d{3})/g, ",$1");
+    const timing = lines[timeIndex].replace(/\.(\d{3})/g, ",$1");
     const textLines = lines.slice(timeIndex + 1).filter(line => line.trim());
     if (!textLines.length) continue;
-    cues.push({ timing, text: textLines.join("\\n") });
+    cues.push({ timing, text: textLines.join("\n") });
   }
   if (!cues.length) throw new Error("មិនមាន Subtitle អក្សរដែលអាចអានបានទេ។ ប្រហែលជាវីដេអូនេះប្រើ Subtitle រូបភាព (PGS/VobSub) ឬមិនមាន Subtitle។");
   if (cues.length > 800) throw new Error("Subtitle មានច្រើនពេក (អតិបរមា ៨០០ ឃ្លាក្នុងការងារមួយ)។ សូមបំបែកវីដេអូជាផ្នែកៗ។");
@@ -523,7 +523,7 @@ async function translateSubtitleSrt(source) {
   for (let offset = 0; offset < cues.length; offset += 25) {
     const batch = cues.slice(offset, offset + 25);
     const payload = batch.map((cue, index) => ({ id: index + 1, text: cue.text }));
-    const prompt = "បកប្រែ Subtitle ខាងក្រោមទៅជាភាសាខ្មែរធម្មជាតិ សមស្របសម្រាប់រឿងភាគ។ រក្សាឈ្មោះមនុស្ស និងន័យដើម។ រក្សាស្លាក HTML ដូចជា <i> និង </i> ប្រសិនបើមាន។ កុំបន្ថែមការពន្យល់។ ឆ្លើយតែ JSON តាមទម្រង់ {\\"translations\\":[\\"...\\"]} ហើយត្រូវមានចំនួនធាតុដូចបញ្ជីដើម។\\n" + JSON.stringify(payload);
+    const prompt = "បកប្រែ Subtitle ខាងក្រោមទៅជាភាសាខ្មែរធម្មជាតិ សមស្របសម្រាប់រឿងភាគ។ រក្សាឈ្មោះមនុស្ស និងន័យដើម។ រក្សាស្លាក HTML ដូចជា <i> និង </i> ប្រសិនបើមាន។ កុំបន្ថែមការពន្យល់។ ឆ្លើយតែ JSON តាមទម្រង់ {\"translations\":[\"...\"]} ហើយត្រូវមានចំនួនធាតុដូចបញ្ជីដើម។\n" + JSON.stringify(payload);
     const raw = await geminiGenerate(TEXT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
       responseMimeType: "application/json", temperature: 0.1
     });
@@ -533,7 +533,7 @@ async function translateSubtitleSrt(source) {
     }
     translations.push(...parsed.translations.map(value => String(value || "").trim()));
   }
-  return cues.map((cue, index) => (index + 1) + "\\n" + cue.timing + "\\n" + (translations[index] || cue.text)).join("\\n\\n") + "\\n";
+  return cues.map((cue, index) => (index + 1) + "\n" + cue.timing + "\n" + (translations[index] || cue.text)).join("\n\n") + "\n";
 }
 
 async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
