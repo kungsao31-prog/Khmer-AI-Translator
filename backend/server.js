@@ -547,16 +547,45 @@ async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
   }
 }
 
+function srtTimestamp(seconds) {
+  const ms = Math.max(0, Math.round(Number(seconds || 0) * 1000));
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  const millis = ms % 1000;
+  return String(hours).padStart(2, "0") + ":" +
+    String(minutes).padStart(2, "0") + ":" +
+    String(secs).padStart(2, "0") + "," +
+    String(millis).padStart(3, "0");
+}
+
+function buildKhmerSrt(segments) {
+  return segments.map((segment, index) =>
+    String(index + 1) + "\n" +
+    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
+    String(segment.translation || "").replace(/\r?\n/g, " ").trim()
+  ).join("\n\n") + "\n";
+}
+
+function escapeFfmpegFilterPath(filePath) {
+  return String(filePath).replace(/\\/g, "\\\\").replace(/:/g, "\\:");
+}
+
 async function createDubbedVideo(req, res, segments, options = {}) {
   if (!req.file) throw new Error("សូមជ្រើសរើសវីដេអូ");
   const work = path.join(TMP, randomUUID());
   await fs.promises.mkdir(work, { recursive: true });
   const output = path.join(work, "khmer-dub.mp4");
+  const subtitleFile = path.join(work, "khmer-subtitles.srt");
 
   try {
     const duration = await videoDuration(req.file.path);
     const valid = normalizeSegments(segments, duration);
     if (!valid.length) throw new Error("មិនមានអត្ថបទខ្មែរសម្រាប់បញ្ចូលសំឡេង");
+    // Burn each translated Khmer cue into the actual video frames. This makes
+    // subtitles visible in every player and social platform, not only in a
+    // separate subtitle track or the app preview.
+    await fs.promises.writeFile(subtitleFile, buildKhmerSrt(valid), "utf8");
 
     // Combine nearby subtitle segments into short speech jobs. This cuts
     // Edge TTS requests substantially while retaining approximate timing.
@@ -670,32 +699,32 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       "-t", String(duration)
     ];
 
-    // Audio is the only changed stream. Copy the original video stream first:
-    // this avoids expensive H.264 re-encoding and greatly reduces RAM/CPU use.
+    // Burning subtitles changes every video frame, so stream-copy is not
+    // possible here. Use a single-threaded ultrafast encode to limit memory.
+    // The subtitles filter requires FFmpeg built with libass; fail clearly
+    // rather than silently returning a video without the requested Khmer text.
+    const subtitleFilter = "subtitles='" + escapeFfmpegFilterPath(subtitleFile) +
+      "':force_style='FontName=Noto Sans Khmer,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=38'";
     const muxStartedAt = Date.now();
     try {
       await runFfmpeg([
         ...args,
         ...audioFilterArgs,
-        "-c:v", "copy",
-        output
-      ]);
-      console.log(`[DUB MP4] Stream-copy mux completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
-    } catch (copyError) {
-      console.warn(`[DUB MP4] Stream-copy mux unavailable; using low-memory H.264 fallback: ${copyError.message}`);
-      await fs.promises.unlink(output).catch(() => {});
-      await runFfmpeg([
-        ...args,
-        ...audioFilterArgs,
+        "-vf", subtitleFilter,
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "25",
         "-threads", "1",
-        "-filter_threads", "1",
-        "-filter_complex_threads", "1",
+        "-pix_fmt", "yuv420p",
         output
       ]);
-      console.log(`[DUB MP4] Low-memory encode completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
+      console.log(`[DUB MP4] Khmer subtitles burned into video; encode completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
+    } catch (encodeError) {
+      const detail = String(encodeError?.message || "");
+      if (/No such filter|subtitles.*not found|libass|fontconfig/i.test(detail)) {
+        throw new Error("FFmpeg នៅលើ Backend មិនទាន់គាំទ្រ Burn-in Subtitle (ត្រូវការ libass និង Font Khmer)។ សូមដំឡើង FFmpeg build ដែលមាន libass មុន។");
+      }
+      throw encodeError;
     }
     const stat = await fs.promises.stat(output);
     if (!stat.size) throw new Error("FFmpeg មិនបានបង្កើតវីដេអូចេញ");
