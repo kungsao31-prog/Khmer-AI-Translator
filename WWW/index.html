@@ -96,6 +96,12 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     <div class="result-video"><video id="dubPlayer" controls playsinline></video></div>
     <button class="btn" id="downloadDub" disabled>⬇ ទាញយក MP4 ម្ដងទៀត</button>
   </div>
+  <div class="divider" style="height:1px;background:#28554b;margin:22px 0"></div>
+  <h3 style="font-size:16px;color:#72f1d1;margin:0 0 6px">🈶 ប្ដូរ Soft Subtitle ចិនទៅជាខ្មែរ</h3>
+  <p class="sub">ប្រើវីដេអូដែលបានជ្រើសខាងលើ។ មុខងារនេះស្គាល់តែ Subtitle ជាអក្សរដែលមានក្នុង Track របស់វីដេអូ (Soft Subtitle) ប៉ុណ្ណោះ។ វាមិនទាន់លុបអក្សរដែលជាប់ក្នុងរូបភាពទេ។</p>
+  <button class="btn alt" id="replaceSoftSubtitles">🌐 បកប្រែ និងបញ្ចូល Subtitle ខ្មែរ</button>
+  <div class="status" id="softSubtitleStatus" role="status">ជ្រើសរើសវីដេអូដែលមាន Soft Subtitle រួចចុចប៊ូតុងនេះ។</div>
+  <button class="btn" id="downloadSoftSubtitleVideo" disabled>⬇ ទាញយក MP4 មាន Subtitle ខ្មែរ</button>
 </section>
 
 <section class="panel" id="panel-files">
@@ -251,6 +257,35 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   $("downloadDub").addEventListener("click",async()=>{if(!dubBlob)return;const button=$("downloadDub");button.disabled=true;try{const message=await saveBlobToPhone(dubBlob,"Khmer-AI-Translated-Video.mp4","video/mp4",p=>setStatus("dubStatus","កំពុងរក្សាទុក MP4 ក្នុងទូរសព្ទ "+p+"%..."));const stored=await saveLibraryFile("Khmer-AI-Translated-Video.mp4",dubBlob,"វីដេអូ MP4");setStatus("dubStatus",message+(stored?"\nបានរក្សាទុកច្បាប់ចម្លងក្នុងកម្មវិធីផងដែរ។":""),"good")}catch(e){setStatus("dubStatus","រក្សាទុកវីដេអូមិនបាន៖ "+e.message,"error")}finally{button.disabled=false}});
   $("translateText").addEventListener("click",async()=>{const t=$("sourceText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូលអត្ថបទដើមជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបកប្រែអត្ថបទ...");const r=await fetch(apiUrl("/api/translate"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,sourceLanguage:$("textLanguage").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"បកប្រែមិនបាន");$("khmerText").value=d.translation||d.translatedText||"";setStatus("textStatus","បកប្រែអត្ថបទរួចរាល់។","good")}catch(e){setStatus("textStatus","បកប្រែមិនបាន៖ "+e.message,"error")}});
   $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();audioBlob=blob;if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
+  let softSubtitleBlob=null;
+  $("replaceSoftSubtitles").addEventListener("click",async()=>{
+    const file=$("videoFile").files[0];
+    if(!file){setStatus("softSubtitleStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
+    const button=$("replaceSoftSubtitles");button.disabled=true;$("downloadSoftSubtitleVideo").disabled=true;
+    try{
+      await ensureBackend();
+      setStatus("softSubtitleStatus","កំពុងផ្ទុកវីដេអូ និងដក Soft Subtitle ដើម...");
+      const form=new FormData();form.append("video",file);
+      const response=await fetch(apiUrl("/api/video/replace-soft-subtitles"),{method:"POST",body:form});
+      if(!response.ok){const detail=await response.json().catch(()=>({}));throw new Error(detail.error||"បកប្រែ Subtitle មិនបាន")}
+      softSubtitleBlob=await response.blob();
+      if(!softSubtitleBlob||softSubtitleBlob.size<1024)throw new Error("ឯកសារ MP4 មិនពេញលេញ");
+      $("downloadSoftSubtitleVideo").disabled=false;
+      setStatus("softSubtitleStatus","បញ្ចូល Subtitle ខ្មែរទៅក្នុង MP4 រួចរាល់ ("+(softSubtitleBlob.size/1048576).toFixed(1)+" MB)។ ចុចទាញយកខាងក្រោម។","good");
+    }catch(error){setStatus("softSubtitleStatus","មិនអាចប្ដូរ Subtitle បាន៖ "+error.message,"error")}
+    finally{button.disabled=false}
+  });
+  $("downloadSoftSubtitleVideo").addEventListener("click",async()=>{
+    if(!softSubtitleBlob)return;
+    const button=$("downloadSoftSubtitleVideo");button.disabled=true;
+    try{
+      const name="Khmer-Video-With-Subtitles.mp4";
+      const message=await saveBlobToPhone(softSubtitleBlob,name,"video/mp4");
+      await saveLibraryFile(name,softSubtitleBlob,"MP4 មាន Subtitle ខ្មែរ");
+      setStatus("softSubtitleStatus",message,"good");
+    }catch(error){setStatus("softSubtitleStatus","រក្សាទុក MP4 មិនបាន៖ "+error.message,"error")}
+    finally{button.disabled=false}
+  });
   $("downloadAudio").addEventListener("click",async()=>{if(audioBlob){downloadBlob(audioBlob,"Khmer-Voice.mp3");await saveLibraryFile("Khmer-Voice.mp3",audioBlob,"សំឡេង MP3")}});
   renderLibrary();
   checkBackend().catch(()=>{});
