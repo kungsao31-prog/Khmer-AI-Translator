@@ -1,14 +1,16 @@
 services:
   - type: web
     name: khmer-ai-translator-pro
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm install
-    startCommand: npm start
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_TEXT_MODEL
