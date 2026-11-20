@@ -29,7 +29,7 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
-const ffmpegPath = require("ffmpeg-static");
+const ffmpegPath = process.env.FFMPEG_PATH || require("ffmpeg-static");
 const { EdgeTTS } = require("node-edge-tts");
 require("dotenv").config();
 
