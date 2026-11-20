@@ -733,7 +733,11 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // possible here. Use a single-threaded ultrafast encode to limit memory.
     // The subtitles filter requires FFmpeg built with libass; fail clearly
     // rather than silently returning a video without the requested Khmer text.
-    const subtitleFilter = "subtitles='" + escapeFfmpegFilterPath(subtitleFile) +
+    // Point libass directly at Debian's Noto font directory. Fontconfig alone
+    // can resolve a family differently across minimal Docker images.
+    const khmerFontsDir = "/usr/share/fonts/truetype/noto";
+    const subtitleFilter = "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
+      "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
       "':force_style='FontName=Noto Sans Khmer,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
     const muxStartedAt = Date.now();
     try {
@@ -754,8 +758,9 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       console.error("[DUB MP4] FFmpeg subtitle burn-in failed; binary:", ffmpegPath);
       console.error("[DUB MP4] FFmpeg stderr:", String(encodeError?.stderr || "").slice(-12000));
       console.error("[DUB MP4] FFmpeg stdout:", String(encodeError?.stdout || "").slice(-3000));
-      if (/No such filter|subtitles.*not found|libass|fontconfig/i.test(detail + " " + String(encodeError?.stderr || ""))) {
-        throw new Error("FFmpeg នៅលើ Backend មិនទាន់គាំទ្រ Burn-in Subtitle (ត្រូវការ libass និង Font Khmer)។ សូមដំឡើង FFmpeg build ដែលមាន libass មុន។");
+      if (/No such filter|subtitles.*not found|libass|fontconfig|cannot find a valid font/i.test(detail + " " + String(encodeError?.stderr || ""))) {
+        throw new Error("បញ្ចូលអក្សរខ្មែរទៅក្នុងវីដេអូមិនបាន។ ព័ត៌មាន FFmpeg: " +
+          (String(encodeError?.stderr || detail).slice(-1800) || "មិនមានព័ត៌មានបន្ថែម"));
       }
       throw encodeError;
     }
