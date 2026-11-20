@@ -606,14 +606,14 @@ function wrapKhmerCaption(value, maxLineLength = 22) {
   }
   if (line.trim()) lines.push(line.trim());
   // Never discard or squash overflow into one clipped subtitle line.
-  return lines.join("\\N");
+  return lines.join("\n");
 }
 
 function buildKhmerSrt(segments) {
   return segments.map((segment, index) =>
     String(index + 1) + "\n" +
     srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
-    wrapKhmerCaption(segment.translation, 30)
+    wrapKhmerCaption(segment.translation, 22)
   ).join("\n\n") + "\n";
 }
 
