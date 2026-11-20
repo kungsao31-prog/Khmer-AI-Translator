@@ -9,7 +9,6 @@ RUN apt-get update \
        ffmpeg \
        fontconfig \
        fonts-noto-core \
-       fonts-khmeros-core \
     && fc-cache -f \
     && fc-match "Noto Sans Khmer" \
     && ffmpeg -hide_banner -filters 2>&1 | grep -q subtitles \
