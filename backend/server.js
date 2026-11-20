@@ -504,6 +504,38 @@ function normalizeSegments(input, duration) {
   ).sort((a, b) => a.start - b.start).slice(0, 600);
 }
 
+async function translateSubtitleSrt(source) {
+  const normalized = String(source || "").replace(/^\\uFEFF/, "").replace(/\\r/g, "");
+  const blocks = normalized.split(/\\n\\s*\\n/).map(block => block.trim()).filter(Boolean);
+  const cues = [];
+  for (const block of blocks) {
+    const lines = block.split("\\n");
+    const timeIndex = lines.findIndex(line => /\\d{2}:\\d{2}:\\d{2}[,.]\\d{3}\\s*-->/.test(line));
+    if (timeIndex < 0) continue;
+    const timing = lines[timeIndex].replace(/\\.(\\d{3})/g, ",$1");
+    const textLines = lines.slice(timeIndex + 1).filter(line => line.trim());
+    if (!textLines.length) continue;
+    cues.push({ timing, text: textLines.join("\\n") });
+  }
+  if (!cues.length) throw new Error("មិនមាន Subtitle អក្សរដែលអាចអានបានទេ។ ប្រហែលជាវីដេអូនេះប្រើ Subtitle រូបភាព (PGS/VobSub) ឬមិនមាន Subtitle។");
+  if (cues.length > 800) throw new Error("Subtitle មានច្រើនពេក (អតិបរមា ៨០០ ឃ្លាក្នុងការងារមួយ)។ សូមបំបែកវីដេអូជាផ្នែកៗ។");
+  const translations = [];
+  for (let offset = 0; offset < cues.length; offset += 25) {
+    const batch = cues.slice(offset, offset + 25);
+    const payload = batch.map((cue, index) => ({ id: index + 1, text: cue.text }));
+    const prompt = "បកប្រែ Subtitle ខាងក្រោមទៅជាភាសាខ្មែរធម្មជាតិ សមស្របសម្រាប់រឿងភាគ។ រក្សាឈ្មោះមនុស្ស និងន័យដើម។ រក្សាស្លាក HTML ដូចជា <i> និង </i> ប្រសិនបើមាន។ កុំបន្ថែមការពន្យល់។ ឆ្លើយតែ JSON តាមទម្រង់ {\\"translations\\":[\\"...\\"]} ហើយត្រូវមានចំនួនធាតុដូចបញ្ជីដើម។\\n" + JSON.stringify(payload);
+    const raw = await geminiGenerate(TEXT_MODEL, [{ role: "user", parts: [{ text: prompt }] }], {
+      responseMimeType: "application/json", temperature: 0.1
+    });
+    const parsed = parseJsonObject(raw);
+    if (!Array.isArray(parsed.translations) || parsed.translations.length !== batch.length) {
+      throw new Error("AI មិនបានបកប្រែ Subtitle ទាំងអស់តាមលំដាប់ទេ។ សូមសាកល្បងម្ដងទៀត។");
+    }
+    translations.push(...parsed.translations.map(value => String(value || "").trim()));
+  }
+  return cues.map((cue, index) => (index + 1) + "\\n" + cue.timing + "\\n" + (translations[index] || cue.text)).join("\\n\\n") + "\\n";
+}
+
 async function analyzeAndTranslateVideo(filePath, mimeType, originalName) {
   const file = await uploadGeminiFile(filePath, mimeType, originalName || "uploaded-video");
   try {
@@ -1064,6 +1096,54 @@ app.post("/api/dub", upload.single("video"), asyncRoute(async (req, res) => {
     return res.status(400).json({ ok: false, error: "ទិន្នន័យចំណងជើងរងមិនត្រឹមត្រូវ" });
   }
   await createDubbedVideo(req, res, segments);
+}));
+
+// Replace the first embedded text-based soft subtitle stream with a Khmer subtitle track.
+app.post("/api/video/replace-soft-subtitles", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
+  const work = path.join(TMP, "soft-sub-" + randomUUID());
+  await fs.promises.mkdir(work, { recursive: true });
+  const sourceSrt = path.join(work, "source.srt");
+  const khmerSrt = path.join(work, "khmer.srt");
+  const output = path.join(work, "Khmer-Video-With-Subtitles.mp4");
+  try {
+    try {
+      await runFfmpeg(["-y", "-i", req.file.path, "-map", "0:s:0", "-c:s", "srt", sourceSrt]);
+    } catch (_) {
+      throw new Error("រកមិនឃើញ Soft Subtitle អក្សរដែលអាចដកចេញបានទេ។ សូមពិនិត្យថាវីដេអូមាន Subtitle track ឬអត់។ Subtitle ប្រភេទរូបភាព PGS/VobSub មិនទាន់គាំទ្រទេ។");
+    }
+    const source = await fs.promises.readFile(sourceSrt, "utf8");
+    const translated = await translateSubtitleSrt(source);
+    await fs.promises.writeFile(khmerSrt, translated, "utf8");
+    await runFfmpeg([
+      "-y", "-i", req.file.path, "-i", khmerSrt,
+      "-map", "0:v:0", "-map", "0:a?", "-map", "1:0",
+      "-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text",
+      "-metadata:s:s:0", "language=khm",
+      "-metadata:s:s:0", "title=Khmer",
+      "-disposition:s:0", "default",
+      "-movflags", "+faststart", output
+    ]);
+    const stat = await fs.promises.stat(output);
+    if (!stat.size) throw new Error("FFmpeg មិនបានបង្កើត MP4 ដែលមាន Subtitle ខ្មែរទេ។");
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", String(stat.size));
+    res.setHeader("Content-Disposition", 'attachment; filename="Khmer-Video-With-Subtitles.mp4"');
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(output, error => {
+      fs.promises.unlink(req.file.path).catch(() => {});
+      fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+      if (error) {
+        console.error("[SOFT SUBTITLE] Delivery failed:", error.message);
+        if (!res.headersSent) res.status(500).json({ ok: false, error: "បញ្ជូន MP4 ដែលមាន Subtitle ខ្មែរមិនបាន។" });
+        else res.destroy(error);
+      }
+    });
+  } catch (error) {
+    await fs.promises.unlink(req.file.path).catch(() => {});
+    await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
 }));
 
 // Multer and general error handler
