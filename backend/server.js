@@ -560,7 +560,7 @@ function srtTimestamp(seconds) {
 }
 
 function wrapKhmerCaption(value, maxLineLength = 30) {
-  const text = String(value || "").replace(/\\s+/gu, " ").trim();
+  const text = String(value || "").replace(/\s+/gu, " ").trim();
   if (!text) return "";
   // Word segmentation keeps Khmer vowel signs and coeng clusters intact.
   let words = [];
