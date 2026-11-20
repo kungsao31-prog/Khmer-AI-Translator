@@ -757,7 +757,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       await runFfmpeg([
         ...args,
         ...audioFilterArgs,
-        "-vf", "scale=1280:1280:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1," + subtitleFilter,
+        "-vf", "scale=720:1280:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1," + subtitleFilter,
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "25",
