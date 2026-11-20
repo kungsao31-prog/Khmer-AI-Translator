@@ -561,14 +561,14 @@ function srtTimestamp(seconds) {
 
 function buildKhmerSrt(segments) {
   return segments.map((segment, index) =>
-    String(index + 1) + "\\n" +
-    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\\n" +
-    String(segment.translation || "").replace(/\\r?\\n/g, " ").trim()
-  ).join("\\n\\n") + "\\n";
+    String(index + 1) + "\n" +
+    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
+    String(segment.translation || "").replace(/\r?\n/g, " ").trim()
+  ).join("\n\n") + "\n";
 }
 
 function escapeFfmpegFilterPath(filePath) {
-  return String(filePath).replace(/\\\\/g, "\\\\\\\\").replace(/:/g, "\\\\:");
+  return String(filePath).replace(/\\/g, "\\\\").replace(/:/g, "\\:");
 }
 
 async function createDubbedVideo(req, res, segments, options = {}) {
