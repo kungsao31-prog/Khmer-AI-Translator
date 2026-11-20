@@ -696,74 +696,51 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     }
     audioFiles.sort((a, b) => a.index - b.index);
 
-    // Replace the source audio entirely with digital silence. Khmer voice
-    // tracks are mixed over this silent bed, so no original language/music leaks.
-    const args = [
-      "-y", "-threads", "1", "-i", req.file.path,
-      "-f", "lavfi", "-t", String(duration), "-i",
-      "anullsrc=channel_layout=stereo:sample_rate=44100"
-    ];
-    for (const audioFile of audioFiles) args.push("-i", audioFile.path);
-
-    const filters = ["[1:a]atrim=duration=" + duration + "[bg]"];
-    const mixInputs = ["[bg]"];
+    // Build the Khmer audio timeline incrementally. Mixing every TTS file in
+    // one filter graph caused excessive RAM use on Render Free (512 MiB).
+    // Each pass mixes only two audio inputs, then releases the previous file.
+    let mixedAudio = path.join(work, "khmer-mix-0.wav");
+    await runFfmpeg([
+      "-y", "-threads", "1",
+      "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+      "-t", String(duration), "-c:a", "pcm_s16le", mixedAudio
+    ]);
 
     for (let index = 0; index < audioFiles.length; index++) {
       const audioFile = audioFiles[index];
-      const label = `voice${index}`;
+      const nextMix = path.join(work, `khmer-mix-${index + 1}.wav`);
       const delay = Math.max(0, Math.round(audioFile.start * 1000));
       const targetDuration = Math.max(0.5, Number(audioFile.targetDuration) || 0.5);
-      // Speed up only when the synthesized Khmer line is longer than its
-      // dialogue window. Shorter lines keep their natural pace and are padded.
       const generatedDuration = await videoDuration(audioFile.path);
       const tempo = Math.max(1, Math.min(2, generatedDuration / targetDuration));
-      filters.push(
-        `[${index + 2}:a]atempo=${tempo.toFixed(4)},` +
-        `loudnorm=I=-16:TP=-1.5:LRA=11,apad,atrim=duration=${targetDuration.toFixed(3)},` +
-        `adelay=${delay}|${delay},volume=1.15[${label}]`
-      );
-      mixInputs.push(`[${label}]`);
+      await runFfmpeg([
+        "-y", "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1",
+        "-i", mixedAudio, "-i", audioFile.path,
+        "-filter_complex",
+        `[1:a]atempo=${tempo.toFixed(4)},loudnorm=I=-16:TP=-1.5:LRA=11,apad,atrim=duration=${targetDuration.toFixed(3)},adelay=${delay}| ${delay},volume=1.15[voice];[0:a][voice]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[out]`.replace("| ", "|"),
+        "-map", "[out]", "-t", String(duration), "-c:a", "pcm_s16le", nextMix
+      ]);
+      await fs.promises.unlink(mixedAudio).catch(() => {});
+      mixedAudio = nextMix;
+      console.log(`[DUB AUDIO] Mixed Khmer voice ${index + 1}/${audioFiles.length}`);
     }
 
-    filters.push(
-      `${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=0,` +
-      "loudnorm=I=-16:TP=-1.5:LRA=11,alimiter=limit=0.95[aout]"
-    );
-
-    const audioFilterArgs = [
-      "-filter_threads", "1",
-      "-filter_complex_threads", "1",
-      "-filter_complex", filters.join(";"),
-      "-map", "0:v:0",
-      "-map", "[aout]",
-      "-c:a", "aac",
-      "-b:a", "160k",
-      "-movflags", "+faststart",
-      "-t", String(duration)
-    ];
-
-    // Burning subtitles changes every video frame, so stream-copy is not
-    // possible here. Use a single-threaded ultrafast encode to limit memory.
-    // The subtitles filter requires FFmpeg built with libass; fail clearly
-    // rather than silently returning a video without the requested Khmer text.
-    // Point libass directly at Debian's Noto font directory. Fontconfig alone
-    // can resolve a family differently across minimal Docker images.
+    // Final pass has only one video and one prepared Khmer audio input.
+    // Keep all FFmpeg worker/thread counts at one to stay within 512 MiB RAM.
+    const muxStartedAt = Date.now();
     const khmerFontsDir = "/usr/share/fonts/truetype/noto";
     const subtitleFilter = "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
       "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
       "':force_style='FontName=Noto Sans Khmer,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
-    const muxStartedAt = Date.now();
     try {
       await runFfmpeg([
-        ...args,
-        ...audioFilterArgs,
+        "-y", "-threads", "1", "-i", req.file.path, "-i", mixedAudio,
+        "-map", "0:v:0", "-map", "1:a:0",
         "-vf", "scale=480:854:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1," + subtitleFilter,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "25",
-        "-threads", "1",
-        "-pix_fmt", "yuv420p",
-        output
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25", "-threads", "1",
+        "-filter_threads", "1", "-filter_complex_threads", "1",
+        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+        "-t", String(duration), "-pix_fmt", "yuv420p", output
       ]);
       console.log(`[DUB MP4] Khmer subtitles burned into video; encode completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
     } catch (encodeError) {
