@@ -745,9 +745,12 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // Keep all FFmpeg worker/thread counts at one to stay within 512 MiB RAM.
     const muxStartedAt = Date.now();
     const khmerFontsDir = "/usr/share/fonts/truetype/noto";
-    const subtitleFilter = "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
+    // Remove the common bottom Chinese subtitle strip before drawing Khmer.
+    // delogo interpolates nearby pixels rather than putting a dark caption box.
+    const subtitleFilter = "delogo=x=0:y=ih*0.78:w=iw:h=ih*0.18:band=6:show=0," +
+      "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
       "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
-      "':force_style='FontName=Noto Sans Khmer,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
+      "':force_style='FontName=Noto Sans Khmer,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
     try {
       await runFfmpeg([
         "-y", "-threads", "1", "-i", req.file.path, "-i", mixedAudio,
