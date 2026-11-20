@@ -566,10 +566,11 @@ function srtTimestamp(seconds) {
     String(millis).padStart(3, "0");
 }
 
-function wrapKhmerCaption(value, maxLineLength = 30) {
+function wrapKhmerCaption(value, maxLineLength = 22) {
   const text = String(value || "").replace(/\s+/gu, " ").trim();
   if (!text) return "";
-  // Word segmentation keeps Khmer vowel signs and coeng clusters intact.
+  // Segment by Khmer words and measure grapheme clusters, never raw UTF-16
+  // code units. This keeps vowel signs and coeng clusters together.
   let words = [];
   try {
     if (typeof Intl.Segmenter === "function") {
@@ -577,12 +578,26 @@ function wrapKhmerCaption(value, maxLineLength = 30) {
         .map(item => item.segment).filter(Boolean);
     }
   } catch (_) {}
-  if (!words.length) words = Array.from(text);
+  if (!words.length) {
+    try {
+      words = [...new Intl.Segmenter("km", { granularity: "grapheme" }).segment(text)]
+        .map(item => item.segment);
+    } catch (_) {
+      words = Array.from(text);
+    }
+  }
+  const graphemeCount = value => {
+    try {
+      return [...new Intl.Segmenter("km", { granularity: "grapheme" }).segment(value)].length;
+    } catch (_) {
+      return Array.from(value).length;
+    }
+  };
   const lines = [];
   let line = "";
   for (const word of words) {
     const candidate = line + word;
-    if (line && Array.from(candidate).length > maxLineLength) {
+    if (line && graphemeCount(candidate.trim()) > maxLineLength) {
       lines.push(line.trim());
       line = word.trimStart();
     } else {
@@ -590,10 +605,8 @@ function wrapKhmerCaption(value, maxLineLength = 30) {
     }
   }
   if (line.trim()) lines.push(line.trim());
-  // Keep captions compact on portrait screens; at most two lines per cue.
-  if (lines.length <= 2) return lines.join("\n");
-  const first = lines[0];
-  return [first, lines.slice(1).join(" ")].join("\n");
+  // Never discard or squash overflow into one clipped subtitle line.
+  return lines.join("\\N");
 }
 
 function buildKhmerSrt(segments) {
@@ -712,12 +725,15 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       const delay = Math.max(0, Math.round(audioFile.start * 1000));
       const targetDuration = Math.max(0.5, Number(audioFile.targetDuration) || 0.5);
       const generatedDuration = await videoDuration(audioFile.path);
-      const tempo = Math.max(1, Math.min(2, generatedDuration / targetDuration));
+      // Speed up only slightly when TTS exceeds its dialogue window. Never
+      // hard-trim the generated sentence: cutting the tail makes Khmer speech
+      // incomplete and creates the impression that audio is out of sync.
+      const tempo = Math.max(1, Math.min(1.2, generatedDuration / targetDuration));
       await runFfmpeg([
         "-y", "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1",
         "-i", mixedAudio, "-i", audioFile.path,
         "-filter_complex",
-        `[1:a]atempo=${tempo.toFixed(4)},loudnorm=I=-16:TP=-1.5:LRA=11,apad,atrim=duration=${targetDuration.toFixed(3)},adelay=${delay}| ${delay},volume=1.15[voice];[0:a][voice]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[out]`.replace("| ", "|"),
+        `[1:a]atempo=${tempo.toFixed(4)},loudnorm=I=-16:TP=-1.5:LRA=11,adelay=${delay}|${delay},volume=1.15[voice];[0:a][voice]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.95[out]`,
         "-map", "[out]", "-t", String(duration), "-c:a", "pcm_s16le", nextMix
       ]);
       await fs.promises.unlink(mixedAudio).catch(() => {});
@@ -736,7 +752,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       await runFfmpeg([
         "-y", "-threads", "1", "-i", req.file.path, "-i", mixedAudio,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-vf", "scale=480:854:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1," + subtitleFilter,
+        "-vf", "scale=432:768:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=432:768:(ow-iw)/2:(oh-ih)/2,setsar=1," + subtitleFilter,
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25", "-threads", "1",
         "-filter_threads", "1", "-filter_complex_threads", "1",
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
@@ -995,7 +1011,7 @@ app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_
         job.stage = "episode_" + (index + 1) + "_preparing_video";
         await runFfmpeg([
           "-y", "-i", built.output,
-          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1",
+          "-vf", "scale=432:768:force_original_aspect_ratio=decrease,pad=432:768:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1",
           "-map", "0:v:0", "-map", "0:a:0",
           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25", "-threads", "1",
           "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2",
