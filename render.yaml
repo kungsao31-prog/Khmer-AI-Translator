@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: khmer-ai-translator-pro
+    name: Khmer-AI-Translator
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
