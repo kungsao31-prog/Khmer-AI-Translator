@@ -235,7 +235,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     const files=Array.from($("seriesFiles").files||[]);
     const total=files.reduce((sum,file)=>sum+file.size,0);
     if(files.length<2||files.length>20){setStatus("seriesStatus","សូមជ្រើសរើសវីដេអូពី ២ ដល់ ២០ ភាគ។","error");return}
-    if(files.some(file=>file.size>200*1024*1024)){setStatus("seriesStatus","មានភាគមួយធំជាង ២០០ MB។ សូមបង្រួមឯកសារនោះជាមុន។","error");return}
+    if(files.some(file=>file.size>1024*1024*1024)){setStatus("seriesStatus","មានភាគមួយធំជាង 1024 MB។ សូមបង្រួមឯកសារនោះជាមុន។","error");return}
     if(total>1024*1024*1024){setStatus("seriesStatus","ទំហំសរុបលើស ១ GB។ សូមបញ្ចូលភាគតិចជាងនេះ ឬបង្រួមវីដេអូ។","error");return}
     seriesBusy=true;$("seriesStart").disabled=true;startTimer();setProgress(0,"កំពុងរៀបចំរឿងភាគ...",false);
     try{
@@ -305,7 +305,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   }
   function requestDubbedVideo(form,onUpload,onServer,onDownload){
     return new Promise((resolve,reject)=>{
-      const upload=new XMLHttpRequest();upload.open("POST",apiUrl("/api/video/jobs"));upload.responseType="json";upload.timeout=15*60*1000;
+      const upload=new XMLHttpRequest();upload.open("POST",apiUrl("/api/video/jobs"));upload.responseType="json";upload.timeout=30*60*1000;
       upload.upload.onprogress=e=>{if(e.lengthComputable)onUpload(Math.round(e.loaded/e.total*100))};
       upload.onload=async()=>{
         let data=upload.response;
@@ -322,7 +322,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
             if(job.status==="failed"){reject(new Error(job.error||"ការបកប្រែវីដេអូមិនបាន"));return}
             if(job.status==="completed"){
               onDownload(0,0,job.size||0);
-              const download=new XMLHttpRequest();download.open("GET",apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)+"/download"));download.responseType="blob";download.timeout=15*60*1000;
+              const download=new XMLHttpRequest();download.open("GET",apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)+"/download"));download.responseType="blob";download.timeout=30*60*1000;
               download.onprogress=e=>{if(e.lengthComputable&&e.total>0)onDownload(Math.round(e.loaded/e.total*100),e.loaded,e.total)};
               download.onload=async()=>{
                 const blob=download.response;
@@ -354,7 +354,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   async function processVideo(file){
     if(isVideoProcessing)return;
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
-    if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}
+    if(file.size>1024*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 1024 MB។","error");return}
     isVideoProcessing=true;stopEstimate();$("translateVideo").disabled=true;$("downloadDub").disabled=true;
     $("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");$("dubPlayer").removeAttribute("src");
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
