@@ -221,7 +221,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   async function processVideo(file){
     if(isVideoProcessing)return;
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
-    if(file.size>200*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 200 MB។","error");return}
+    if(file.size>1024*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 1024 MB។","error");return}
     isVideoProcessing=true;stopEstimate();$("scanVideo").disabled=true;$("downloadDub").disabled=true;
     $("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");$("dubPlayer").removeAttribute("src");$("dubStatus").textContent="កំពុងដំណើរការ...";$("dubStatus").className="status";
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
