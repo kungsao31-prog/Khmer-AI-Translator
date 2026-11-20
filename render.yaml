@@ -18,4 +18,10 @@ services:
       - key: GEMINI_TTS_MODEL
         value: gemini-2.5-flash-preview-tts
       - key: MAX_VIDEO_MB
-        value: 1024
+        value: 200
+      - key: MAX_SERIES_TOTAL_MB
+        value: 200
+      - key: EDGE_TTS_CONCURRENCY
+        value: 1
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=256
