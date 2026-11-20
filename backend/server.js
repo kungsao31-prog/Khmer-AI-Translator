@@ -50,7 +50,7 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash
   .split(",").map(value => value.trim()).filter(Boolean);
 const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
 const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
-const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 200));
+const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 1024));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -442,7 +442,7 @@ async function runFfmpeg(args) {
   if (!ffmpegPath) throw new Error("រកមិនឃើញ FFmpeg binary");
   return execFileAsync(ffmpegPath, args, {
     maxBuffer: 30 * 1024 * 1024,
-    timeout: 30 * 60 * 1000
+    timeout: 2 * 60 * 60 * 1000
   });
 }
 
