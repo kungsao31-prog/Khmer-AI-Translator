@@ -584,17 +584,17 @@ function wrapKhmerCaption(value, maxLineLength = 30) {
   }
   if (line.trim()) lines.push(line.trim());
   // Keep captions compact on portrait screens; at most two lines per cue.
-  if (lines.length <= 2) return lines.join("\\n");
+  if (lines.length <= 2) return lines.join("\n");
   const first = lines[0];
-  return [first, lines.slice(1).join(" ")].join("\\n");
+  return [first, lines.slice(1).join(" ")].join("\n");
 }
 
 function buildKhmerSrt(segments) {
   return segments.map((segment, index) =>
-    String(index + 1) + "\\n" +
-    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\\n" +
+    String(index + 1) + "\n" +
+    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
     wrapKhmerCaption(segment.translation, 30)
-  ).join("\\n\\n") + "\\n";
+  ).join("\n\n") + "\n";
 }
 
 function escapeFfmpegFilterPath(filePath) {
@@ -615,7 +615,13 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // Burn each translated Khmer cue into the actual video frames. This makes
     // subtitles visible in every player and social platform, not only in a
     // separate subtitle track or the app preview.
-    await fs.promises.writeFile(subtitleFile, buildKhmerSrt(valid), "utf8");
+    const srtContent = buildKhmerSrt(valid);
+    await fs.promises.writeFile(subtitleFile, srtContent, { encoding: "utf8", flag: "w" });
+    const srtStat = await fs.promises.stat(subtitleFile);
+    if (!srtStat.size || !(await fs.promises.access(subtitleFile).then(() => true).catch(() => false))) {
+      throw new Error("មិនអាចបង្កើតឯកសារ Subtitle SRT បានទេ");
+    }
+    console.log(`[DUB SRT] Created ${subtitleFile} (${srtStat.size} bytes, UTF-8, ${valid.length} cues)`);
 
     // Combine nearby subtitle segments into short speech jobs. This cuts
     // Edge TTS requests substantially while retaining approximate timing.
