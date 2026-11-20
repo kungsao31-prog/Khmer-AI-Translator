@@ -559,12 +559,42 @@ function srtTimestamp(seconds) {
     String(millis).padStart(3, "0");
 }
 
+function wrapKhmerCaption(value, maxLineLength = 30) {
+  const text = String(value || "").replace(/\\s+/gu, " ").trim();
+  if (!text) return "";
+  // Word segmentation keeps Khmer vowel signs and coeng clusters intact.
+  let words = [];
+  try {
+    if (typeof Intl.Segmenter === "function") {
+      words = [...new Intl.Segmenter("km", { granularity: "word" }).segment(text)]
+        .map(item => item.segment).filter(Boolean);
+    }
+  } catch (_) {}
+  if (!words.length) words = Array.from(text);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line + word;
+    if (line && Array.from(candidate).length > maxLineLength) {
+      lines.push(line.trim());
+      line = word.trimStart();
+    } else {
+      line = candidate;
+    }
+  }
+  if (line.trim()) lines.push(line.trim());
+  // Keep captions compact on portrait screens; at most two lines per cue.
+  if (lines.length <= 2) return lines.join("\\n");
+  const first = lines[0];
+  return [first, lines.slice(1).join(" ")].join("\\n");
+}
+
 function buildKhmerSrt(segments) {
   return segments.map((segment, index) =>
-    String(index + 1) + "\n" +
-    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
-    String(segment.translation || "").replace(/\r?\n/g, " ").trim()
-  ).join("\n\n") + "\n";
+    String(index + 1) + "\\n" +
+    srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\\n" +
+    wrapKhmerCaption(segment.translation, 30)
+  ).join("\\n\\n") + "\\n";
 }
 
 function escapeFfmpegFilterPath(filePath) {
@@ -704,7 +734,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // The subtitles filter requires FFmpeg built with libass; fail clearly
     // rather than silently returning a video without the requested Khmer text.
     const subtitleFilter = "subtitles='" + escapeFfmpegFilterPath(subtitleFile) +
-      "':force_style='FontName=Noto Sans Khmer,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=38'";
+      "':force_style='FontName=Noto Sans Khmer,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H90000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
     const muxStartedAt = Date.now();
     try {
       await runFfmpeg([
