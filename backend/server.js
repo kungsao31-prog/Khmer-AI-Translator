@@ -751,7 +751,10 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       console.log(`[DUB MP4] Khmer subtitles burned into video; encode completed in ${((Date.now() - muxStartedAt) / 1000).toFixed(1)}s`);
     } catch (encodeError) {
       const detail = String(encodeError?.message || "");
-      if (/No such filter|subtitles.*not found|libass|fontconfig/i.test(detail)) {
+      console.error("[DUB MP4] FFmpeg subtitle burn-in failed; binary:", ffmpegPath);
+      console.error("[DUB MP4] FFmpeg stderr:", String(encodeError?.stderr || "").slice(-12000));
+      console.error("[DUB MP4] FFmpeg stdout:", String(encodeError?.stdout || "").slice(-3000));
+      if (/No such filter|subtitles.*not found|libass|fontconfig/i.test(detail + " " + String(encodeError?.stderr || ""))) {
         throw new Error("FFmpeg នៅលើ Backend មិនទាន់គាំទ្រ Burn-in Subtitle (ត្រូវការ libass និង Font Khmer)។ សូមដំឡើង FFmpeg build ដែលមាន libass មុន។");
       }
       throw encodeError;
