@@ -50,18 +50,25 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3.7-flash
   .split(",").map(value => value.trim()).filter(Boolean);
 const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
 const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1500)));
-const MAX_VIDEO_MB = Math.max(1, Number(process.env.MAX_VIDEO_MB || 1024));
+const MAX_VIDEO_MB = Math.max(1, Math.min(200, Number(process.env.MAX_VIDEO_MB || 200)));
 const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 fs.mkdirSync(TMP, { recursive: true });
 
+// Periodically remove completed job files to protect the free instance disk.
+const cleanupTimer = setInterval(() => {
+  pruneFinishedJobs(videoJobs);
+  pruneFinishedJobs(seriesJobs);
+}, 5 * 60 * 1000);
+cleanupTimer.unref();
+
 // In-process video jobs let the phone upload once, poll while AI works, then download the finished MP4.
 // Keep the Render service at one instance unless job state and files are moved to shared storage.
 const videoJobs = new Map();
 let activeMediaJobId = null;
-const JOB_RETENTION_MS = 2 * 60 * 60 * 1000;
+const JOB_RETENTION_MS = 30 * 60 * 1000;
 
 function pruneFinishedJobs(jobs) {
   const now = Date.now();
@@ -88,7 +95,7 @@ const seriesUpload = multer({
 });
 const seriesJobs = new Map();
 const MAX_SERIES_FILES = 20;
-const MAX_SERIES_TOTAL_MB = 1024;
+const MAX_SERIES_TOTAL_MB = Math.max(1, Math.min(200, Number(process.env.MAX_SERIES_TOTAL_MB || 200)));
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -750,7 +757,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
       await runFfmpeg([
         ...args,
         ...audioFilterArgs,
-        "-vf", subtitleFilter,
+        "-vf", "scale=1280:1280:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1," + subtitleFilter,
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "25",
