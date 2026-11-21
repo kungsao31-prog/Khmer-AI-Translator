@@ -1082,7 +1082,7 @@ app.get("/api/series/jobs/:id", authenticate, (req, res) => {
 
 app.get("/api/series/jobs/:id/download", authenticate, (req, res) => {
   const job = seriesJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
   if (job.status !== "completed" || !job.output) {
     return res.status(409).json({ ok: false, error: "រឿងភាគមិនទាន់ភ្ជាប់រួចរាល់ទេ" });
   }
@@ -1119,7 +1119,7 @@ app.get("/api/video/jobs/:id", authenticate, (req, res) => {
 
 app.get("/api/video/jobs/:id/download", authenticate, (req, res) => {
   const job = videoJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
   if (job.status !== "completed" || !job.output) {
     return res.status(409).json({ ok: false, error: "វីដេអូមិនទាន់រួចរាល់ទេ" });
   }
