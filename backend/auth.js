@@ -16,7 +16,7 @@ if (JWT_SECRET.length < 32) throw new Error("JWT_SECRET must contain at least 32
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false },
+  ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: true },
   max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000
 });
 const loginAttempts = new Map();
