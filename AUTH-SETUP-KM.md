@@ -34,7 +34,7 @@ Optional:
 4. Set ADMIN_EMAIL and a strong ADMIN_PASSWORD in Render before deploying.
 5. Never add the real database URL, admin password, JWT secret, or Gemini key to GitHub.
 
-A provider's free-tier limits and retention policies can change. Confirm that the database remains persistent and does not sleep/delete data unexpectedly.
+Important: Render Free Postgres is temporary: it expires 30 days after creation, then has a 14-day upgrade grace period before deletion. It has no backups. Do not use it for permanent user accounts. Prefer a persistent database provider (for example, a suitable Neon plan) or upgrade Render Postgres before expiry. See https://render.com/docs/free.
 
 ## API
 - POST /api/auth/register — { email, password }; only when ENABLE_REGISTRATION=true.
