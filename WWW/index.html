@@ -42,6 +42,40 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .library-item small{color:#9bbcb5;font-size:11px}
 .library-item button{border:1px solid #2a9e8b;border-radius:10px;background:#123d38;color:#dffff8;padding:7px 10px}
 @media(max-width:650px){.app{grid-template-columns:58px minmax(0,1fr);gap:7px;padding:7px}.rail{top:7px;height:calc(100dvh - 14px);min-height:500px;border-radius:20px;padding:9px 3px;gap:9px}.brand{width:44px;height:44px}.nav{width:49px;min-height:56px;border-radius:17px}.panel{padding:12px}.video-wrap video{max-height:48vh}.library-item{flex-wrap:wrap}.library-item .meta{min-width:65%}}
+
+/* CineKhmer AI distinct cinematic identity — gold / burgundy, no teal console look */
+:root{color-scheme:dark;--bg:#10090d;--panel:#211219;--panel2:#170d12;--line:#60404a;--mint:#e7b65a;--cyan:#f1d18c;--text:#fff5e8;--muted:#c1a9a0;--purple:#4b1c2d;--danger:#ff7777}
+body{background:radial-gradient(ellipse at 50% -15%,#59243a 0,#1a0e15 42%,#09070a 100%);color:var(--text);font-family:system-ui,"Noto Sans Khmer",sans-serif}
+.app{max-width:1000px;display:block;padding:18px 16px 28px}
+.rail{position:static;height:auto;min-height:0;display:flex;flex-direction:row;justify-content:flex-start;overflow-x:auto;align-items:center;gap:9px;padding:10px 12px;margin-bottom:20px;border-radius:18px;background:#1c1017;border:1px solid #62404a;box-shadow:0 12px 32px #0008}
+.brand{flex:0 0 48px;width:48px;height:48px;margin:0 10px 0 0;border-radius:15px;background:linear-gradient(145deg,#e8b95f,#8c492c);border:1px solid #f5d58d;color:#26120d;box-shadow:0 0 24px #d99a3b33}
+.nav{flex:0 0 auto;width:auto;min-width:68px;min-height:48px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;padding:8px 12px;border-radius:13px;border:1px solid #62404a;background:#2b1720;color:#ead6c8;font-size:16px;box-shadow:none}
+.nav small{font-size:11px}.nav.active{background:linear-gradient(130deg,#d59a42,#9d512f);border-color:#f4d18a;color:#24110e;box-shadow:0 5px 18px #d59a4233}
+.rail .spacer{display:none}
+.top{margin:0 0 18px;padding:22px 22px;border-radius:22px;border:1px solid #6b4650;background:linear-gradient(110deg,#3c1928,#1c1118 65%,#28141d);box-shadow:0 18px 40px #0006;position:relative;overflow:hidden}
+.top:after{content:"CINEMA • KHMER • AI";position:absolute;right:18px;bottom:7px;color:#f1cf8b22;font-weight:900;letter-spacing:4px;font-size:clamp(12px,3vw,25px);pointer-events:none}
+.top h1{font-family:Georgia,serif;font-size:clamp(24px,5vw,34px);letter-spacing:.5px;color:#f3cb7c}
+.top p{color:#d9b9a9;font-size:13px}
+.pill{background:#160e13;border-color:#8a5a47;color:#f2d9a5}
+.dot.ok{background:#e4b653;box-shadow:0 0 8px #e4b653}
+.panel{border-radius:22px;border:1px solid #68444d;background:linear-gradient(150deg,#291720,#170f14);box-shadow:0 16px 38px #0006;padding:20px}
+.panel h2{color:#f0c778;font-family:Georgia,"Noto Sans Khmer",serif;font-size:20px}
+.sub{color:#c4a9a2}
+.field label{color:#f0d9c6}
+.field input,.field select,.field textarea{background:#120b10;border:1px solid #65414a;color:#fff4e7;border-radius:12px}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#e7b65a;box-shadow:0 0 0 2px #e7b65a22}
+.btn{background:linear-gradient(115deg,#dba84f,#a75b36);border:1px solid #f3d18a;color:#26130d;border-radius:12px}
+.btn.alt{background:#321a25;border-color:#8b5961;color:#f5dfca}
+.status{background:#140c11;border-color:#62414a;color:#e9cdbb}
+.status.good{border-color:#ad8746;color:#f7dfaa}
+.video-wrap{border:2px solid #bd8a45;box-shadow:0 0 20px #b67b3530}
+.subtitle{background:#1a0c12d9;color:#ffe6ac;border:1px solid #e0b66a;text-shadow:0 2px 5px #000}
+.progress{background:#432532}.progress>i{background:linear-gradient(90deg,#a64b36,#f1c86d)}
+.segment-list{border-color:#60404a}.segment{border-color:#4a2b35}.segment time{color:#e9c06e}
+.library-item{background:#170d12;border-color:#63414a}.library-item button{background:#42212b;border-color:#a56d54;color:#ffedcf}
+.foot{color:#a98b83}
+@media(max-width:650px){.app{display:block;padding:9px}.rail{height:auto;min-height:0;top:auto;position:static;margin-bottom:12px;gap:6px;padding:8px}.brand{width:40px;height:40px;flex-basis:40px;margin-right:4px}.nav{width:auto;min-width:48px;min-height:44px;padding:7px 9px;gap:4px;border-radius:11px}.nav small{font-size:9px}.top{padding:17px 15px}.top:after{font-size:11px;letter-spacing:2px}.panel{padding:14px}.panel h2{font-size:18px}}
+
 </style>
 </head>
 <body>
@@ -118,7 +152,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   <button class="btn" id="downloadAudio" disabled>⬇ ទាញយកសំឡេង MP3</button>
   <div class="status" id="textStatus" role="status">រួចរាល់។</div>
 </section>
-<div class="foot">Khmer AI Translator Pro · រក្សា API Key នៅ Backend · ឯកសារដែលទាញយកនឹងរក្សាទុកតាមការកំណត់ Browser/Android។</div>
+<div class="foot">CineKhmer AI · AI Video Dubbing Studio · រក្សា API Key នៅ Backend · ឯកសារដែលទាញយកនឹងរក្សាទុកតាមការកំណត់ Browser/Android។</div>
 </main>
 </div>
 <script>
