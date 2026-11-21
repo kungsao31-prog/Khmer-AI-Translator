@@ -204,7 +204,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   const rawFetch=window.fetch.bind(window);
   window.fetch=async function(resource,options={}) {
     const url=typeof resource==="string"?resource:(resource&&resource.url)||"";
-    const protectedApi=url.includes("/api/")&&!url.includes("/api/health")&&!url.includes("/api/auth/");
+    const isAuthProfile=url.includes("/api/auth/me")||url.includes("/api/auth/admin/");\n    const protectedApi=url.includes("/api/")&&!url.includes("/api/health")&&(!url.includes("/api/auth/")||isAuthProfile);
     if(protectedApi&&authAccess){const headers=new Headers(options.headers||(resource instanceof Request?resource.headers:undefined));headers.set("Authorization","Bearer "+authAccess);options={...options,headers};}
     let response=await rawFetch(resource,options);
     if(response.status===401&&protectedApi&&authRefresh){
