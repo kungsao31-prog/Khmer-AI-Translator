@@ -297,7 +297,6 @@ function parseJsonObject(text) {
   }
   throw new Error("Gemini បានផ្ញើ JSON មិនត្រឹមត្រូវ ទោះបានជួសជុលសញ្ញា escape ក៏ដោយ។ សូមសាកល្បងម្ដងទៀត។");
 }
-
 function getMimeType(file) {
   const ext = path.extname(file.originalname || "").toLowerCase();
   const map = {
@@ -597,8 +596,7 @@ function wrapKhmerCaption(value, maxLineLength = 22) {
   let line = "";
   for (const word of words) {
     const candidate = line + word;
-    if (line && graphemeCount(candidate.trim()) > maxLineLength) {
-      lines.push(line.trim());
+    if (line && graphemeCount(candidate.trim()) > maxLineLength) {      lines.push(line.trim());
       line = word.trimStart();
     } else {
       line = candidate;
@@ -745,12 +743,11 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     // Keep all FFmpeg worker/thread counts at one to stay within 512 MiB RAM.
     const muxStartedAt = Date.now();
     const khmerFontsDir = "/usr/share/fonts/truetype/noto";
-    // Remove the common bottom Chinese subtitle strip before drawing Khmer.
-    // delogo interpolates nearby pixels rather than putting a dark caption box.
-    // Avoid delogo here: FFmpeg delogo expression support varies between builds,
-    // and unsupported frame-size expressions can abort the entire video encode.
-    // Burn Khmer subtitles directly; retain the original picture underneath.
-    const subtitleFilter = "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
+    // Cover the embedded Chinese subtitle strip with a semi-transparent rectangle,
+    // then render Khmer captions above it. drawbox supports frame-size expressions
+    // and avoids the incompatible delogo options seen on some FFmpeg builds.
+    const subtitleFilter = "drawbox=x=0:y=ih*0.78:w=iw:h=ih*0.22:color=black@0.72:t=fill," +
+      "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
       "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
       "':force_style='FontName=Noto Sans Khmer,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
     try {
@@ -897,8 +894,7 @@ app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"
       getMimeType(req.file),
       req.file.originalname
     );
-    if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
-    await createDubbedVideo(req, res, result.segments);
+    if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");    await createDubbedVideo(req, res, result.segments);
   } catch (error) {
     await fs.promises.unlink(req.file.path).catch(() => {});
     throw error;
