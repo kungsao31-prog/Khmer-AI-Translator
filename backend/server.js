@@ -573,7 +573,7 @@ function srtTimestamp(seconds) {
     String(millis).padStart(3, "0");
 }
 
-function wrapKhmerCaption(value, maxLineLength = 22) {
+function wrapKhmerCaption(value, maxLineLength = 18) {
   const text = String(value || "").replace(/\s+/gu, " ").trim();
   if (!text) return "";
   // Segment by Khmer words and measure grapheme clusters, never raw UTF-16
@@ -619,7 +619,7 @@ function buildKhmerSrt(segments) {
   return segments.map((segment, index) =>
     String(index + 1) + "\n" +
     srtTimestamp(segment.start) + " --> " + srtTimestamp(segment.end) + "\n" +
-    wrapKhmerCaption(segment.translation, 22)
+    wrapKhmerCaption(segment.translation, 18)
   ).join("\n\n") + "\n";
 }
 
@@ -728,13 +728,15 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     for (let index = 0; index < audioFiles.length; index++) {
       const audioFile = audioFiles[index];
       const nextMix = path.join(work, `khmer-mix-${index + 1}.wav`);
-      const delay = Math.max(0, Math.round(audioFile.start * 1000));
+      // Start Khmer speech slightly before the estimated mouth-motion timestamp to compensate for synthesis/playback onset lag.
+      const speechLeadSeconds = 0.18;
+      const delay = Math.max(0, Math.round((audioFile.start - speechLeadSeconds) * 1000));
       const targetDuration = Math.max(0.5, Number(audioFile.targetDuration) || 0.5);
       const generatedDuration = await videoDuration(audioFile.path);
       // Speed up only slightly when TTS exceeds its dialogue window. Never
       // hard-trim the generated sentence: cutting the tail makes Khmer speech
       // incomplete and creates the impression that audio is out of sync.
-      const tempo = Math.max(1, Math.min(1.2, generatedDuration / targetDuration));
+      const tempo = Math.max(1, Math.min(1.35, generatedDuration / targetDuration));
       await runFfmpeg([
         "-y", "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1",
         "-i", mixedAudio, "-i", audioFile.path,
@@ -757,7 +759,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     const subtitleFilter = "drawbox=x=0:y=ih*0.78:w=iw:h=ih*0.22:color=black@0.72:t=fill," +
       "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
       "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
-      "':force_style='FontName=Noto Sans Khmer,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
+      "':force_style='FontName=Noto Sans Khmer,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=36'";
     try {
       await runFfmpeg([
         "-y", "-threads", "1", "-i", req.file.path, "-i", mixedAudio,
