@@ -82,7 +82,15 @@ function pruneFinishedJobs(jobs) {
 }
 
 app.disable("x-powered-by");
-app.use(cors({ origin: true }));
+// APK WebViews may send Origin: null when index.html is loaded from file://.
+// This API uses no cookies or browser credentials, so wildcard CORS is safe here
+// and avoids reflecting the opaque "null" origin back to the Android WebView.
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400
+}));
 app.use(express.json({ limit: "2mb" }));
 
 const upload = multer({
