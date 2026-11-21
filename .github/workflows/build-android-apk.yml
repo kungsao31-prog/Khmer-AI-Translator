@@ -54,6 +54,11 @@ jobs:
           node --version
           npm --version
 
+      - name: Validate backend JavaScript
+        run: |
+          node --check backend/server.js
+          node --check backend/auth.js
+
       - name: Build web application
         run: npm run build
 
@@ -167,11 +172,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Khmer-Al-Translator-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
       - name: Verify APK exists
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
