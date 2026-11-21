@@ -62,9 +62,9 @@ jobs:
           const fs = require("fs");
           for (const file of ["index.html", "WWW/index.html"]) {
             const html = fs.readFileSync(file, "utf8");
-            const match = html.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/);
+            const match = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
             if (!match) throw new Error("Inline JavaScript not found in " + file);
-            const out = "/tmp/" + file.replace(/\\//g, "-") + ".js";
+            const out = "/tmp/" + file.replace(/\//g, "-") + ".js";
             fs.writeFileSync(out, match[1]);
             console.log("Extracted " + file + " -> " + out);
           }
