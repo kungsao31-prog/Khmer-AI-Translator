@@ -16,10 +16,10 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .rail .spacer{flex:1}.main{min-width:0}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 3px 14px}.top h1{font-size:21px;margin:0}.top p{font-size:12px;color:var(--muted);margin:2px 0}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #2d6257;background:#0e2925;border-radius:99px;padding:7px 11px;font-size:11px;color:#b8f9e5}.dot{width:8px;height:8px;border-radius:50%;background:#ffc65b;display:inline-block}.dot.ok{background:#16e6a8;box-shadow:0 0 8px #16e6a8}
 .panel{display:none;background:linear-gradient(155deg,#102825,#0b1d1c);border:1px solid #28554b;border-radius:24px;padding:18px;margin-bottom:14px;box-shadow:0 15px 40px #0003}.panel.active{display:block}.panel h2{font-size:18px;margin:0 0 5px;color:#66f2d0}.sub{font-size:12px;color:var(--muted);margin:0 0 15px}
 .field{margin:12px 0}.field label{display:block;font-size:13px;color:#cce9e2;margin:0 0 6px}.field input,.field select,.field textarea{width:100%;background:#071b1a;border:1px solid #315c54;color:var(--text);border-radius:12px;padding:12px;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--mint);box-shadow:0 0 0 2px #19e6b022}.field textarea{min-height:112px;resize:vertical}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{border:1px solid #1ce2b4;background:linear-gradient(120deg,#0bbd94,#087d7a);color:#fff;border-radius:13px;padding:12px 15px;font-weight:750;width:100%;margin-top:8px}.btn.alt{background:#132e2b;border-color:#3b7166;color:#d7fff5}.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{border:1px solid #1ce2b4;background:linear-gradient(120deg,#0bbd94,#087d7a);color:#fff;border-radius:13px;padding:12px 15px;font-weight:750;width:100%;margin-top:8px}.btn.alt{background:#132e2b;border-color:#3b7166;color:#d7fff5}.btn.video-action{font-size:17px;padding:16px 14px;margin-top:12px;background:linear-gradient(120deg,#00c995,#087dba);border:2px solid #70ffe0;box-shadow:0 0 18px #00d9ad44}.btn:disabled{opacity:.45;cursor:not-allowed}
 .note{font-size:11px;color:var(--muted);margin:7px 0}.status{border:1px solid #315d52;background:#071b19;border-radius:13px;padding:11px;margin-top:12px;color:#b8f8e5;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}.status.error{border-color:#874c4c;color:#ffc3c3}.status.good{border-color:#168e6d;color:#a8ffe3}
 .video-wrap{background:#020a09;border:1px solid #27645b;border-radius:19px;overflow:hidden;margin-top:12px;position:relative}.video-wrap video{width:100%;max-height:470px;display:block;background:#000}.subtitle{position:absolute;left:5%;right:5%;bottom:12%;text-align:center;color:white;font-weight:800;font-size:22px;line-height:1.45;text-shadow:0 2px 5px #000;background:#0008;padding:5px 9px;border-radius:8px;pointer-events:none}
-.time-row{display:flex;justify-content:space-between;color:#b4d7ce;font-size:12px;padding:8px 2px}.progress{height:7px;background:#203b36;border-radius:99px;overflow:hidden;margin-top:8px}.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#13d6a3,#2ad5f0);transition:width .2s}.progress.indeterminate>i{width:35%;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
+.time-row{display:flex;justify-content:space-between;color:#b4d7ce;font-size:12px;padding:8px 2px}.progress{height:12px;background:#203b36;border-radius:99px;overflow:hidden;margin-top:8px}.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#13d6a3,#2ad5f0);transition:width .2s}.progress.indeterminate>i{width:35%;animation:move 1.2s infinite ease-in-out}@keyframes move{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
 .segment-list{max-height:300px;overflow:auto;border:1px solid #294f47;border-radius:12px;margin-top:12px}.segment{padding:10px 12px;border-bottom:1px solid #24463f;font-size:13px}.segment:last-child{border:0}.segment time{display:block;color:#5de7c2;font-size:11px;margin-bottom:4px}.segment .original{color:#9dbdb5;font-size:11px}
 .result-video{margin-top:12px}.result-video video{width:100%;border-radius:14px;background:#000}
 .hidden{display:none!important}.foot{text-align:center;color:#789d93;font-size:11px;padding:18px 4px}
@@ -42,17 +42,61 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 .library-item small{color:#9bbcb5;font-size:11px}
 .library-item button{border:1px solid #2a9e8b;border-radius:10px;background:#123d38;color:#dffff8;padding:7px 10px}
 @media(max-width:650px){.app{grid-template-columns:58px minmax(0,1fr);gap:7px;padding:7px}.rail{top:7px;height:calc(100dvh - 14px);min-height:500px;border-radius:20px;padding:9px 3px;gap:9px}.brand{width:44px;height:44px}.nav{width:49px;min-height:56px;border-radius:17px}.panel{padding:12px}.video-wrap video{max-height:48vh}.library-item{flex-wrap:wrap}.library-item .meta{min-width:65%}}
+
+/* Version 1.5 — portrait neon dubbing console inspired by the user's reference */
+body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 100%);padding-bottom:92px}
+.app{display:block;max-width:760px;min-height:100vh;padding:12px 12px 110px}
+.main{width:100%}
+.top{background:linear-gradient(110deg,#211b36,#101b29);border:1px solid #635a83;border-radius:22px;padding:12px 16px;box-shadow:0 0 22px #5d4aa633}
+.top h1{color:#e8e1ff;letter-spacing:.2px}
+.top p{color:#b9b2d7}
+.rail{position:fixed;z-index:20;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));top:auto;width:min(620px,calc(100% - 24px));height:76px;min-height:0;border-radius:28px;border:1.5px solid #8274a8;background:linear-gradient(100deg,#171827f5,#0b1522f5);box-shadow:0 0 22px #7164b955,inset 0 0 12px #ffffff0a;display:flex;flex-direction:row;justify-content:space-around;align-items:center;padding:7px 10px;gap:5px;backdrop-filter:blur(14px)}
+.rail .brand,.rail .spacer{display:none}
+.nav{flex:1;width:auto;min-width:0;min-height:54px;border-radius:18px;border:1px solid transparent;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:21px;padding:4px 2px;box-shadow:none}
+.nav small{font-size:9px;color:#b7b4c9}
+.nav.active{background:linear-gradient(120deg,#7af4e4,#44cbbb);border-color:#9efff3;color:#15333a;box-shadow:0 0 18px #53e9df77}
+.nav.active small{color:#174047;font-weight:800}
+.panel{border-radius:28px;border:1px solid #657b83;background:linear-gradient(150deg,#222b31,#111c25);box-shadow:0 18px 48px #0008;padding:17px}
+.panel h2{color:#79f5eb}
+.panel.active{animation:panelIn .22s ease-out}
+@keyframes panelIn{from{opacity:.7;transform:translateY(5px)}to{opacity:1;transform:none}}
+.video-wrap{width:min(100%,390px);aspect-ratio:9/16;max-height:64vh;margin:16px auto 8px;border:2px solid #37f0e7;border-radius:24px;background:#090b20;box-shadow:0 0 20px #19e9e077;display:flex;align-items:center;justify-content:center}
+.video-wrap video{width:100%;height:100%;max-height:none;object-fit:contain}
+.preview-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;color:#c8baff;font-weight:800;font-size:17px;pointer-events:none}
+.video-wrap:has(video[src]) .preview-placeholder{display:none}
+.video-wrap .subtitle{z-index:2;bottom:12%;font-size:18px}
+.time-row{color:#d1d3e7}
+.progress{background:#293344;border:1px solid #3b5360}
+.progress>i{background:linear-gradient(90deg,#36eacb,#44c9ff)}
+.btn{border-radius:22px;background:linear-gradient(110deg,#16cba9,#1765b8);border-color:#58f8e5;box-shadow:0 0 16px #1bd7c044}
+.btn.video-action{border-radius:24px;background:linear-gradient(110deg,#332a92,#211d68);border-color:#5149bc;box-shadow:0 0 18px #3933aa66}
+.field input,.field select,.field textarea{background:#101827;border-color:#455c70}
+.status{background:#101b29;border-color:#425d70}
+@media(max-width:650px){
+ .app{padding:8px 8px 108px}
+ .rail{width:calc(100% - 22px);height:72px;bottom:max(10px,env(safe-area-inset-bottom));border-radius:25px;padding:6px 8px}
+ .nav{min-height:52px;border-radius:17px;font-size:20px}
+ .nav small{font-size:8px}
+ .panel{padding:13px;border-radius:23px}
+ .video-wrap{width:min(100%,360px);max-height:62vh}
+ .video-wrap video{max-height:none}
+ .top{padding:10px 12px}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
 <aside class="rail" aria-label="ម៉ឺនុយកម្មវិធី">
   <div class="brand">🇰🇭</div>
-  <button class="nav active" data-panel="backend" aria-label="Backend" title="ការភ្ជាប់ Backend">⚙️<small>01</small></button>
+  <button class="nav active" data-panel="auth" id="authNav" aria-label="គណនី" title="ចូលគណនី">🔐<small>01</small></button>
+  <button class="nav" data-panel="backend" aria-label="Backend" title="ការភ្ជាប់ Backend">⚙️<small>02</small></button>
   <button class="nav" data-panel="video" aria-label="បកប្រែវីដេអូ" title="បកប្រែវីដេអូ">🎬<small>02</small></button>
   <button class="nav" data-panel="text" aria-label="បកប្រែអត្ថបទ" title="បកប្រែអត្ថបទ">✨<small>03</small></button>
   <button class="nav" data-panel="files" aria-label="ឯកសាររបស់ខ្ញុំ" title="ឯកសាររបស់ខ្ញុំ">📁<small>04</small></button>
   <div class="spacer"></div>
+  <button class="nav" data-panel="admin" id="adminNav" aria-label="អ្នកគ្រប់គ្រង" style="display:none">🛡️<small>Admin</small></button>
+  <button class="nav" id="logoutNav" aria-label="ចាកចេញ">↪<small>ចេញ</small></button>
   <button class="nav" id="homeNav" aria-label="ទំព័រដើម">⌂<small>Home</small></button>
 </aside>
 <main class="main">
@@ -61,7 +105,29 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   <div class="pill"><span class="dot" id="connectionDot"></span><span id="connectionLabel">មិនទាន់ភ្ជាប់</span></div>
 </header>
 
-<section class="panel active" id="panel-backend">
+
+<section class="panel active" id="panel-auth">
+  <h2>🔐 ចូលប្រើ Khmer AI Translator Pro</h2>
+  <p class="sub">សូមចូលគណនី ឬបង្កើតគណនីថ្មី ដើម្បីប្រើសេវាបកប្រែវីដេអូ។</p>
+  <div class="field"><label for="authEmail">អ៊ីមែល</label><input id="authEmail" type="email" autocomplete="username" placeholder="name@example.com"></div>
+  <div class="field"><label for="authPassword">ពាក្យសម្ងាត់ (យ៉ាងតិច ១០ តួ)</label><input id="authPassword" type="password" autocomplete="current-password" minlength="10" placeholder="ពាក្យសម្ងាត់"></div>
+  <button class="btn" id="authLogin">ចូលគណនី</button>
+  <button class="btn alt" id="authRegister">បង្កើតគណនីថ្មី</button>
+  <div class="status" id="authStatus" role="status">Token ត្រូវបានផ្ទៀងផ្ទាត់នៅ Backend។ កុំចែករំលែកពាក្យសម្ងាត់របស់អ្នក។</div>
+</section>
+\n
+<section class="panel" id="panel-admin">
+  <h2>🛡️ Admin Dashboard</h2>
+  <p class="sub">គ្រប់គ្រងសិទ្ធិ និងស្ថានភាពគណនីអ្នកប្រើ។</p>
+  <div class="field"><label for="newUserEmail">អ៊ីមែលអ្នកប្រើថ្មី</label><input id="newUserEmail" type="email" placeholder="user@example.com"></div>
+  <div class="field"><label for="newUserPassword">ពាក្យសម្ងាត់ថ្មី (១០–៧២ bytes)</label><input id="newUserPassword" type="password"></div>
+  <div class="field"><label for="newUserRole">តួនាទី</label><select id="newUserRole"><option value="user">User</option><option value="admin">Admin</option></select></div>
+  <button class="btn" id="adminCreateUser">បង្កើតគណនី</button>
+  <button class="btn alt" id="adminReload">ផ្ទុកបញ្ជីឡើងវិញ</button>
+  <div class="status" id="adminStatus">Admin only.</div>
+  <div class="library-list" id="adminUsers"></div>
+</section>
+\n<section class="panel" id="panel-backend">
   <h2>① ការភ្ជាប់ Backend</h2>
   <p class="sub">រក្សាទុក Render Backend URL និងពិនិត្យសេវា API មុនពេលប្រើ។</p>
   <div class="field"><label for="backendUrl">Render Backend URL</label><input id="backendUrl" type="url" inputmode="url" value="https://khmer-ai-translator.onrender.com" placeholder="https://your-service.onrender.com"></div>
@@ -80,10 +146,10 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     </select></div>
     <div class="field"><label for="voiceGender">សំឡេងខ្មែរ</label><select id="voiceGender"><option value="female">សំឡេងស្រី</option><option value="male">សំឡេងប្រុស</option></select></div>
   </div>
-  <div class="video-wrap hidden" id="originalWrap"><video id="originalVideo" controls playsinline></video><div class="subtitle" id="subtitlePreview"></div></div>
+  <div class="video-wrap" id="originalWrap"><video id="originalVideo" controls playsinline></video><div class="preview-placeholder" id="previewPlaceholder">9:16 Video Preview<br>ជ្រើសរើសវីដេអូ ដើម្បីមើល Preview</div><div class="subtitle" id="subtitlePreview"></div></div>
   <div class="time-row"><span id="currentTime">00:00</span><span id="videoDuration">--:--</span></div>
-  <div class="field"><label for="scanProgress">ដំណើរការស្វ័យប្រវត្តិ</label><div class="progress" id="progressTrack"><i id="progressBar"></i></div><div class="time-row"><span id="progressLabel">មិនទាន់ចាប់ផ្ដើម</span><strong id="progressPercent">0%</strong><span id="elapsedTime">00:00</span></div></div>
-  <button class="btn alt" id="scanVideo">↻ ដំណើរការវីដេអូម្ដងទៀត</button>
+  <div class="field"><label for="scanProgress">ភាគរយដំណើរការបកប្រែវីដេអូ</label><div class="progress" id="progressTrack"><i id="progressBar"></i></div><div class="time-row"><span id="progressLabel">ត្រៀមរួចរាល់</span><strong id="progressPercent">0%</strong><span id="elapsedTime">00:00</span></div></div>
+  <button class="btn video-action" id="translateVideo">🎬 បកប្រែវីដេអូជាភាសាខ្មែរ</button>
   <div class="status" id="videoStatus" role="status">ជ្រើសរើសវីដេអូ ដើម្បីផ្ទុក បកប្រែ បង្កើត និងរក្សាទុក MP4 ដោយស្វ័យប្រវត្តិ។</div>
   <div id="segmentsArea" class="hidden">
     <h3 style="font-size:15px;color:#72f1d1;margin:18px 0 5px">លទ្ធផលស្គាល់សំឡេង និងពេលវេលា</h3>
@@ -91,6 +157,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     <button class="btn alt" id="downloadSrt">⬇ ទាញយកចំណងជើងរង SRT</button>
     <button class="btn" id="createDub">🎬 បង្កើតវីដេអូបញ្ចូលសំឡេងខ្មែរ</button>
   </div>
+  <div class="divider" style="height:1px;background:#28554b;margin:22px 0"></div>
+  <h3 style="font-size:16px;color:#72f1d1;margin:0 0 6px">🎞️ បកប្រែរឿងភាគច្រើនភាគ ហើយភ្ជាប់ជាវីដេអូតែមួយ</h3>
+  <p class="sub">ជ្រើសរើសភាគតាមលំដាប់ (២–២០ ភាគ)។ ប្រព័ន្ធនឹងបកប្រែម្តងមួយភាគ បន្ទាប់មកភ្ជាប់ជា MP4 តែមួយ។ ទំហំសរុបអតិបរមា ១ GB និងមួយភាគមិនលើស ២០០ MB។</p>
+  <div class="field"><label for="seriesFiles">ជ្រើសរើសឯកសារភាគច្រើន (តាមលំដាប់ដែលអ្នកជ្រើស)</label><input id="seriesFiles" type="file" accept="video/*" multiple></div>
+  <div class="status" id="seriesFileList">មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។</div>
+  <button class="btn" id="seriesStart">🎬 បកប្រែគ្រប់ភាគ និងភ្ជាប់ជា MP4 តែមួយ</button>
+  <div class="status" id="seriesStatus" role="status">សូមជ្រើសរើសវីដេអូ ២–២០ ភាគ រួចចុចប៊ូតុងខាងលើ។ កុំបិទកម្មវិធីរហូតដល់បញ្ចប់។</div>
   <div id="dubResult" class="hidden">
     <div class="status good" id="dubStatus">វីដេអូបកប្រែរួចរាល់។</div>
     <div class="result-video"><video id="dubPlayer" controls playsinline></video></div>
@@ -125,6 +198,39 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
 (function(){
   const $=id=>document.getElementById(id);
   const DEFAULT_URL="https://khmer-ai-translator.onrender.com";
+  let authAccess=localStorage.getItem("khmerAuthAccess")||"";
+  let authRefresh=localStorage.getItem("khmerAuthRefresh")||"";
+  let authUser=null;
+  function saveAuth(data){authAccess=data.accessToken;authRefresh=data.refreshToken;authUser=data.user;localStorage.setItem("khmerAuthAccess",authAccess);localStorage.setItem("khmerAuthRefresh",authRefresh);$("adminNav").style.display=authUser&&authUser.role==="admin"?"flex":"none";$("connectionLabel").textContent=authUser?authUser.email:"មិនទាន់ចូល"}
+  function clearAuth(){authAccess="";authRefresh="";authUser=null;localStorage.removeItem("khmerAuthAccess");localStorage.removeItem("khmerAuthRefresh");$("adminNav").style.display="none";showPanel("auth")}
+  async function authRequest(path,body){const response=await fetch(apiUrl("/api/auth/"+path),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Authentication failed");return data}
+  const rawFetch=window.fetch.bind(window);
+  window.fetch=async function(resource,options={}) {
+    const url=typeof resource==="string"?resource:(resource&&resource.url)||"";
+    const isAuthProfile=url.includes("/api/auth/me")||url.includes("/api/auth/admin/");
+    const protectedApi=url.includes("/api/")&&!url.includes("/api/health")&&(!url.includes("/api/auth/")||isAuthProfile);
+    if(protectedApi&&authAccess){const headers=new Headers(options.headers||(resource instanceof Request?resource.headers:undefined));headers.set("Authorization","Bearer "+authAccess);options={...options,headers};}
+    let response=await rawFetch(resource,options);
+    if(response.status===401&&protectedApi&&authRefresh){
+      try{const refreshed=await authRequest("refresh",{refreshToken:authRefresh});saveAuth(refreshed);const headers=new Headers(options.headers);headers.set("Authorization","Bearer "+authAccess);response=await rawFetch(resource,{...options,headers});}catch(_){clearAuth()}
+    }
+    return response;
+  };
+  const xhrOpen=XMLHttpRequest.prototype.open,xhrSend=XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open=function(method,url){this.__khmerAuthUrl=String(url);return xhrOpen.apply(this,arguments)};
+  XMLHttpRequest.prototype.send=function(body){
+    const url=this.__khmerAuthUrl||"";
+    if(url.includes("/api/")&&!url.includes("/api/health")&&!url.includes("/api/auth/")&&authAccess)this.setRequestHeader("Authorization","Bearer "+authAccess);
+    return xhrSend.call(this,body);
+  };
+  $("authLogin").addEventListener("click",async()=>{try{setStatus("authStatus","កំពុងចូលគណនី...");const data=await authRequest("login",{email:$("authEmail").value,password:$("authPassword").value});saveAuth(data);setStatus("authStatus","ចូលគណនីបានជោគជ័យ។","good");showPanel("backend");await checkBackend()}catch(e){setStatus("authStatus",e.message,"error")}});
+  $("authRegister").addEventListener("click",async()=>{try{setStatus("authStatus","កំពុងបង្កើតគណនី...");const data=await authRequest("register",{email:$("authEmail").value,password:$("authPassword").value});saveAuth(data);setStatus("authStatus","បង្កើតគណនីបានជោគជ័យ។","good");showPanel("backend");await checkBackend()}catch(e){setStatus("authStatus",e.message,"error")}});
+  $("logoutNav").addEventListener("click",async()=>{try{if(authRefresh)await authRequest("logout",{refreshToken:authRefresh})}catch(_){}clearAuth()});
+  async function loadAdminUsers(){const response=await fetch(apiUrl("/api/auth/admin/users"));const data=await response.json();if(!response.ok)throw new Error(data.error||"មិនអាចផ្ទុកអ្នកប្រើ");$("adminUsers").innerHTML=data.users.map(u=>'<div class="library-item"><div class="meta"><strong>'+escapeHtml(u.email)+'</strong><small>'+escapeHtml(u.role)+' · '+(u.active?"Active":"Disabled")+'</small></div><button data-admin-role="'+escapeHtml(u.id)+'" data-role="'+(u.role==="admin"?"user":"admin")+'">'+(u.role==="admin"?"ដក Admin":"ផ្ដល់ Admin")+'</button><button data-admin-active="'+escapeHtml(u.id)+'" data-active="'+(!u.active)+'">'+(u.active?"បិទ":"បើក")+'</button><button data-admin-revoke="'+escapeHtml(u.id)+'">ដក Session</button></div>').join("")||'<div class="status">គ្មានអ្នកប្រើ</div>'}
+  $("adminReload").addEventListener("click",async()=>{try{await loadAdminUsers();setStatus("adminStatus","ផ្ទុកបញ្ជីអ្នកប្រើរួចរាល់។","good")}catch(e){setStatus("adminStatus",e.message,"error")}});
+  $("adminCreateUser").addEventListener("click",async()=>{try{const r=await fetch(apiUrl("/api/auth/admin/users"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("newUserEmail").value,password:$("newUserPassword").value,role:$("newUserRole").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"បង្កើតមិនបាន");$("newUserPassword").value="";await loadAdminUsers();setStatus("adminStatus","បង្កើតគណនីបានជោគជ័យ។","good")}catch(e){setStatus("adminStatus",e.message,"error")}});
+  $("adminUsers").addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;try{let url,body;if(b.dataset.adminRole){url="/role";body={role:b.dataset.role}}else if(b.dataset.adminActive){url="/status";body={active:b.dataset.active==="true"}}else if(b.dataset.adminRevoke){url="/revoke-sessions";body={}}else return;const id=b.dataset.adminRole||b.dataset.adminActive||b.dataset.adminRevoke;const response=await fetch(apiUrl("/api/auth/admin/users/"+encodeURIComponent(id)+url),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const d=await response.json();if(!response.ok)throw new Error(d.error||"សកម្មភាពមិនបាន");await loadAdminUsers();setStatus("adminStatus","ធ្វើបច្ចុប្បន្នភាពបានជោគជ័យ។","good")}catch(err){setStatus("adminStatus",err.message,"error")}});
+
   let originalUrl="",dubUrl="",audioUrl="",dubBlob=null,audioBlob=null,segments=[],timer=null,startedAt=0,estimateTimer=null,isVideoProcessing=false;
   const LIB_DB="khmer-ai-translator-library",LIB_STORE="files";
   function openLibrary(){return new Promise((resolve,reject)=>{if(!("indexedDB" in window)){reject(new Error("ទូរសព្ទមិនគាំទ្រកន្លែងរក្សាទុកក្នុងកម្មវិធី"));return}const req=indexedDB.open(LIB_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LIB_STORE))req.result.createObjectStore(LIB_STORE,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error("បើកកន្លែងរក្សាទុកមិនបាន"))})}
@@ -169,11 +275,83 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   document.querySelectorAll(".nav[data-panel]").forEach(b=>b.addEventListener("click",()=>{showPanel(b.dataset.panel);if(b.dataset.panel==="files")renderLibrary()}));
   $("libraryList").addEventListener("click",async e=>{const b=e.target.closest("button[data-action]");if(!b)return;const item=b.closest(".library-item");if(!item)return;try{if(b.dataset.action==="download")await downloadLibraryItem(item.dataset.id);else if(b.dataset.action==="delete"&&confirm("លុបឯកសារនេះចេញពីកម្មវិធី?"))await deleteLibraryItem(item.dataset.id)}catch(err){alert(err.message)}});
   $("homeNav").addEventListener("click",()=>showPanel("backend"));
+  $("adminNav").addEventListener("click",async()=>{showPanel("admin");try{await loadAdminUsers()}catch(e){setStatus("adminStatus",e.message,"error")}});
   $("backendUrl").value=localStorage.getItem("khmerBackendUrl")||DEFAULT_URL;
   async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល URL");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");const r=await fetch(u+"/api/health",{method:"GET"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Backend មិនឆ្លើយតប");$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
   $("checkBackend").addEventListener("click",async()=>{try{await checkBackend()}catch(e){$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនអាចភ្ជាប់";setStatus("backendStatus","ភ្ជាប់មិនបាន៖ "+e.message,"error")}});
   async function ensureBackend(){if(!$("connectionDot").classList.contains("ok"))await checkBackend()}
-  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB) · ចាប់ផ្ដើមដំណើរការដោយស្វ័យប្រវត្តិ...";$("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");segments=[];processVideo(f)});
+
+  let seriesBusy=false;
+  $("seriesFiles").addEventListener("change",()=>{
+    const files=Array.from($("seriesFiles").files||[]);
+    const total=files.reduce((sum,file)=>sum+file.size,0);
+    $("seriesFileList").textContent=files.length
+      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
+      : "មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។";
+  });
+  $("seriesStart").addEventListener("click",async()=>{
+    if(seriesBusy)return;
+    const files=Array.from($("seriesFiles").files||[]);
+    const total=files.reduce((sum,file)=>sum+file.size,0);
+    if(files.length<2||files.length>20){setStatus("seriesStatus","សូមជ្រើសរើសវីដេអូពី ២ ដល់ ២០ ភាគ។","error");return}
+    if(files.some(file=>file.size>1024*1024*1024)){setStatus("seriesStatus","មានភាគមួយធំជាង 1024 MB។ សូមបង្រួមឯកសារនោះជាមុន។","error");return}
+    if(total>1024*1024*1024){setStatus("seriesStatus","ទំហំសរុបលើស ១ GB។ សូមបញ្ចូលភាគតិចជាងនេះ ឬបង្រួមវីដេអូ។","error");return}
+    seriesBusy=true;$("seriesStart").disabled=true;startTimer();setProgress(0,"កំពុងរៀបចំរឿងភាគ...",false);
+    try{
+      await ensureBackend();
+      const form=new FormData();
+      files.forEach(file=>form.append("videos",file,file.name));
+      form.append("sourceLanguage",$("sourceLanguage").value);
+      form.append("gender",$("voiceGender").value);
+      setStatus("seriesStatus","កំពុងផ្ទុក "+files.length+" ភាគទៅ Backend...");
+      const jobId=await new Promise((resolve,reject)=>{
+        const xhr=new XMLHttpRequest();xhr.open("POST",apiUrl("/api/series/jobs"));xhr.responseType="json";xhr.timeout=30*60*1000;
+        xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);setProgress(p*0.15,"កំពុងផ្ទុករឿងភាគ "+p+"%",false)}};
+        xhr.onload=()=>{const data=xhr.response||{};if(xhr.status===202&&data.jobId)resolve(data.jobId);else reject(new Error(data.error||"មិនអាចចាប់ផ្ដើមការងាររឿងភាគបាន"))};
+        xhr.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញពេលផ្ទុករឿងភាគ"));
+        xhr.ontimeout=()=>reject(new Error("ការផ្ទុករឿងភាគចំណាយពេលលើស ៣០ នាទី"));
+        xhr.send(form);
+      });
+      setStatus("seriesStatus","ផ្ទុករួចហើយ។ កំពុងបកប្រែភាគនីមួយៗតាមលំដាប់...");
+      const started=Date.now();
+      let completedJob=null;
+      while(Date.now()-started<12*60*60*1000){
+        const response=await fetch(apiUrl("/api/series/jobs/"+encodeURIComponent(jobId)),{cache:"no-store"});
+        const job=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(job.error||"មិនអាចពិនិត្យស្ថានភាពរឿងភាគបាន");
+        const current=Number(job.currentEpisode)||0,totalEpisodes=Number(job.totalEpisodes)||files.length;
+        const pct=15+((current?current-1:0)/totalEpisodes)*70;
+        setProgress(pct,"កំពុងបកប្រែភាគ "+current+"/"+totalEpisodes+" · "+(job.stage||"processing"),true);
+        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\\n")||"កំពុងដំណើរការ...");
+        if(job.status==="failed")throw new Error(job.error||"បកប្រែរឿងភាគមិនបាន");
+        if(job.status==="completed"){completedJob=job;break}
+        await new Promise(resolve=>setTimeout(resolve,5000));
+      }
+      if(!completedJob)throw new Error("ការងាររឿងភាគចំណាយពេលលើស ១២ ម៉ោង។ សូមពិនិត្យ Backend ម្តងទៀត។");
+      setProgress(88,"គ្រប់ភាគរួចរាល់ · កំពុងទាញយក MP4...",false);
+      const download=await fetch(apiUrl("/api/series/jobs/"+encodeURIComponent(jobId)+"/download"));
+      if(!download.ok){const d=await download.json().catch(()=>({}));throw new Error(d.error||"ទាញយក MP4 រឿងភាគមិនបាន")}
+      const blob=await download.blob();
+      if(!blob||blob.size<1024)throw new Error("ឯកសារ MP4 ចុងក្រោយទទេ ឬមិនពេញលេញ");
+      if(dubUrl)URL.revokeObjectURL(dubUrl);
+      dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("dubResult").classList.remove("hidden");$("downloadDub").disabled=false;
+      setProgress(94,"MP4 រួចរាល់ · កំពុងរក្សាទុក...",false);
+      try{
+        const message=await saveBlobToPhone(blob,"Khmer-Complete-Series.mp4","video/mp4",p=>setProgress(94+p*.06,"កំពុងរក្សាទុក MP4 "+p+"%",false));
+        const stored=await saveLibraryFile("Khmer-Complete-Series.mp4",blob,"រឿងភាគខ្មែរភ្ជាប់រួច");
+        setProgress(100,"រួចរាល់ · 100%",false);
+        setStatus("seriesStatus","បកប្រែ "+files.length+" ភាគ និងភ្ជាប់ជា MP4 តែមួយរួចរាល់។ "+message+(stored?" បានរក្សាទុកក្នុងកម្មវិធីផងដែរ。":""),"good");
+      }catch(saveError){
+        setProgress(94,"MP4 រួចរាល់ · ត្រូវរក្សាទុកដោយដៃ",false);
+        setStatus("seriesStatus","បានបង្កើត MP4 រួច ប៉ុន្តែរក្សាទុកស្វ័យប្រវត្តិមិនបាន៖ "+saveError.message+"។ សូមចុច ទាញយក MP4 ម្ដងទៀត។","error");
+      }
+    }catch(error){
+      setStatus("seriesStatus","មានបញ្ហា៖ "+error.message,"error");
+    }finally{
+      stopTimer();seriesBusy=false;$("seriesStart").disabled=false;
+    }
+  });
+  $("videoFile").addEventListener("change",()=>{const f=$("videoFile").files[0];if(!f)return;if(originalUrl)URL.revokeObjectURL(originalUrl);originalUrl=URL.createObjectURL(f);$("originalVideo").src=originalUrl;$("originalWrap").classList.remove("hidden");$("previewPlaceholder").classList.add("hidden");$("videoStatus").textContent="បានជ្រើសរើស៖ "+f.name+" ("+(f.size/1048576).toFixed(1)+" MB)។ សូមចុចប៊ូតុង «បកប្រែវីដេអូជាភាសាខ្មែរ» ខាងក្រោម ដើម្បីចាប់ផ្ដើម។";$("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");setProgress(0,"ត្រៀមរួចរាល់ · ចុចប៊ូតុងបកប្រែ",false);segments=[]});
   $("originalVideo").addEventListener("loadedmetadata",()=>{$("videoDuration").textContent=fmt($("originalVideo").duration)});
   $("originalVideo").addEventListener("timeupdate",()=>{$("currentTime").textContent=fmt($("originalVideo").currentTime);const t=$("originalVideo").currentTime,s=segments.find(x=>t>=x.start&&t<x.end);$("subtitlePreview").textContent=s?(s.translation||s.khmer||""):""});
   function xhrUpload(path,form,onProgress){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",apiUrl(path));x.responseType="json";x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};x.onload=()=>{let d=x.response;if(!d&&x.responseText){try{d=JSON.parse(x.responseText)}catch(_){}}if(x.status>=200&&x.status<300)resolve(d||{});else reject(new Error((d&&d.error)||("Server error "+x.status)))};x.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));x.onabort=()=>reject(new Error("បានបោះបង់ការផ្ទុក"));x.send(form)})}
@@ -184,46 +362,60 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
     const expectedMs=Math.max(45000,Math.min(240000,clipSeconds*2500));
     estimateTimer=setInterval(()=>{const fraction=Math.min(.98,(Date.now()-started)/expectedMs);setProgress(18+fraction*64,"AI កំពុងស្គេន បកប្រែ និងបង្កើតសំឡេង (ភាគរយប្រហែល)",true)},1000);
   }
-  async function requestDubbedVideo(form,onUpload,onServer,onDownload){
-    const job=await xhrUpload("/api/video/jobs",form,onUpload);
-    if(!job||!job.jobId)throw new Error("Backend មិនបានផ្ដល់លេខការងារវីដេអូ");
-    onServer();
-    const jobUrl=apiUrl("/api/video/jobs/"+encodeURIComponent(job.jobId));
-    let completed=false;
-    for(let attempt=0;attempt<4320;attempt++){
-      await new Promise(resolve=>setTimeout(resolve,2500));
-      const response=await fetch(jobUrl,{cache:"no-store"});
-      const state=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(state.error||"ពិនិត្យស្ថានភាពការងារមិនបាន");
-      if(state.status==="failed")throw new Error(state.error||"បកប្រែវីដេអូមិនបាន");
-      if(state.status==="completed"){
-        completed=true;
-        break;
-      }
-      const stage=state.stage==="analyzing_video"
-        ?"AI កំពុងស្គេន និងបកប្រែវីដេអូ"
-        :state.stage==="creating_khmer_voice_and_mp4"
-          ?"កំពុងបង្កើតសំឡេងខ្មែរ និង MP4"
-          :"កំពុងរៀបចំការងារ";
-      setStatus("videoStatus",stage+"។ សូមកុំបិទកម្មវិធី។");
-    }
-    if(!completed)throw new Error("ការងារចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យស្ថានភាព Backend មុនសាកល្បងម្ដងទៀត។");
-    const downloadResponse=await fetch(jobUrl+"/download",{cache:"no-store"});
-    if(!downloadResponse.ok){
-      const detail=await downloadResponse.json().catch(()=>({}));
-      throw new Error(detail.error||"ទាញយក MP4 ពី Backend មិនបាន");
-    }
-    const blob=await downloadResponse.blob();
-    if(!blob||blob.size<1024)throw new Error("ម៉ាស៊ីនមេបានផ្ញើ MP4 ទទេ ឬមិនពេញលេញ");
-    onDownload(100,blob.size,blob.size);
-    return blob;
+  function requestDubbedVideo(form,onUpload,onServer,onDownload){
+    return new Promise((resolve,reject)=>{
+      const upload=new XMLHttpRequest();upload.open("POST",apiUrl("/api/video/jobs"));upload.responseType="json";upload.timeout=30*60*1000;
+      upload.upload.onprogress=e=>{if(e.lengthComputable)onUpload(Math.round(e.loaded/e.total*100))};
+      upload.onload=async()=>{
+        let data=upload.response;
+        if(!data&&upload.responseText){try{data=JSON.parse(upload.responseText)}catch(_){}}
+        if(upload.status!==202||!data?.jobId){reject(new Error(data?.error||"Backend មិនអាចចាប់ផ្ដើមការងារបាន"));return}
+        onServer();
+        const jobId=data.jobId;let failures=0;const started=Date.now();
+        const poll=async()=>{
+          try{
+            const response=await fetch(apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)),{cache:"no-store"});
+            const job=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(job.error||"មិនអាចពិនិត្យស្ថានភាពការងារបាន");
+            failures=0;
+            if(job.status==="failed"){reject(new Error(job.error||"ការបកប្រែវីដេអូមិនបាន"));return}
+            if(job.status==="completed"){
+              onDownload(0,0,job.size||0);
+              const download=new XMLHttpRequest();download.open("GET",apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)+"/download"));download.responseType="blob";download.timeout=30*60*1000;
+              download.onprogress=e=>{if(e.lengthComputable&&e.total>0)onDownload(Math.round(e.loaded/e.total*100),e.loaded,e.total)};
+              download.onload=async()=>{
+                const blob=download.response;
+                if(download.status>=200&&download.status<300&&blob&&blob.size>1024)resolve(blob);
+                else{let message=blob?await blob.text().catch(()=>""):"";let error="ទាញយក MP4 មិនបាន";try{error=JSON.parse(message).error||error}catch(_){}reject(new Error(error))}
+              };
+              download.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញពេលទាញយក MP4"));
+              download.ontimeout=()=>reject(new Error("ទាញយក MP4 ចំណាយពេលលើស 15 នាទី"));
+              download.send();return;
+            }
+            if(Date.now()-started>3*60*60*1000){reject(new Error("ការបកប្រែចំណាយពេលលើស 3 ម៉ោង។ សូមពិនិត្យសេវាកម្ម Backend។"));return}
+            setProgress(18,"AI កំពុងធ្វើការ · "+(job.stage||"processing"),true);
+            setStatus("videoStatus","AI កំពុងបកប្រែសំឡេងខ្មែរ។ សូមកុំបិទទំព័រ...");
+            setTimeout(poll,4000);
+          }catch(error){
+            failures++;
+            if(failures>=8){reject(error);return}
+            setTimeout(poll,Math.min(15000,3000*failures));
+          }
+        };
+        poll();
+      };
+      upload.onerror=()=>reject(new Error("បញ្ហាបណ្ដាញ ឬការភ្ជាប់ Backend"));
+      upload.ontimeout=()=>reject(new Error("ការផ្ទុកវីដេអូចំណាយពេលលើស 15 នាទី"));
+      upload.onabort=()=>reject(new Error("ការផ្ទុកត្រូវបានបោះបង់"));
+      upload.send(form);
+    });
   }
   async function processVideo(file){
     if(isVideoProcessing)return;
     if(!file){setStatus("videoStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
     if(file.size>1024*1024*1024){setStatus("videoStatus","វីដេអូធំពេក។ ទំហំអតិបរមា 1024 MB។","error");return}
-    isVideoProcessing=true;stopEstimate();$("scanVideo").disabled=true;$("downloadDub").disabled=true;
-    $("segmentsArea").classList.add("hidden");$("dubResult").classList.add("hidden");$("dubPlayer").removeAttribute("src");$("dubStatus").textContent="កំពុងដំណើរការ...";$("dubStatus").className="status";
+    isVideoProcessing=true;stopEstimate();$("translateVideo").disabled=true;$("downloadDub").disabled=true;
+    $("segmentsArea").classList.add("hidden");$("dubResult").classList.remove("hidden");$("dubPlayer").removeAttribute("src");
     if(dubUrl){URL.revokeObjectURL(dubUrl);dubUrl=""}dubBlob=null;startTimer();
     setProgress(0,"កំពុងរៀបចំវីដេអូ...",false);setStatus("dubStatus","កំពុងត្រៀមផ្ទុកវីដេអូទៅ Backend...");
     try{
@@ -234,7 +426,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
         ()=>{setProgress(18,"ផ្ទុករួច · AI កំពុងធ្វើការ",true);setStatus("videoStatus","ផ្ទុកវីដេអូរួចហើយ។ AI កំពុងស្គេន បកប្រែ និងបង្កើតសំឡេងខ្មែរ...");startEstimate()},
         (p,loaded,total)=>{stopEstimate();setProgress(82+p*.12,"កំពុងទទួល MP4 "+p+"% ("+(loaded/1048576).toFixed(1)+"/"+(total/1048576).toFixed(1)+" MB)",false);setStatus("videoStatus","វីដេអូខ្មែរបានបង្កើតរួច។ កំពុងទាញយក MP4...")}
       );
-      stopEstimate();dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;$("dubResult").classList.remove("hidden");
+      stopEstimate();dubBlob=blob;dubUrl=URL.createObjectURL(blob);$("dubPlayer").src=dubUrl;$("downloadDub").disabled=false;
       setProgress(94,"MP4 រួចរាល់ · កំពុងរក្សាទុកក្នុងទូរសព្ទ",false);setStatus("dubStatus","បង្កើត MP4 បានជោគជ័យ ("+(blob.size/1048576).toFixed(1)+" MB)។ កំពុងរក្សាទុកដោយស្វ័យប្រវត្តិ...");
       try{
         const message=await saveBlobToPhone(blob,"Khmer-AI-Translated-Video.mp4","video/mp4",p=>setProgress(94+p*.06,"កំពុងរក្សាទុក MP4 ក្នុងទូរសព្ទ "+p+"%",false));
@@ -243,9 +435,9 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
         setStatus("videoStatus","បកប្រែ និងទាញយក MP4 ដោយស្វ័យប្រវត្តិរួចរាល់។","good");
       }catch(saveError){setProgress(94,"MP4 រួចរាល់ · ត្រូវរក្សាទុកដោយដៃ",false);setStatus("dubStatus","MP4 បានបង្កើតរួចហើយ ប៉ុន្តែរក្សាទុកស្វ័យប្រវត្តិមិនបាន៖ "+saveError.message+"។ សូមចុចប៊ូតុង ទាញយក MP4 ម្ដងទៀត។","error")}
     }catch(e){stopEstimate();setStatus("videoStatus","មានបញ្ហា៖ "+e.message,"error");setStatus("dubStatus","ដំណើរការមិនបាន៖ "+e.message,"error");setProgress(0,"បរាជ័យ · សូមសាកល្បងម្ដងទៀត",false)}
-    finally{stopEstimate();stopTimer();isVideoProcessing=false;$("scanVideo").disabled=false}
+    finally{stopEstimate();stopTimer();isVideoProcessing=false;$("translateVideo").disabled=false}
   }
-  $("scanVideo").addEventListener("click",()=>processVideo($("videoFile").files[0]));
+  $("translateVideo").addEventListener("click",()=>processVideo($("videoFile").files[0]));
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
   $("downloadSrt").addEventListener("click",async()=>{if(!segments.length)return;const content=segments.map((s,i)=>(i+1)+"\n"+srtTime(s.start)+" --> "+srtTime(s.end)+"\n"+s.translation).join("\n\n")+"\n";const blob=new Blob(["\uFEFF"+content],{type:"text/plain;charset=utf-8"});downloadBlob(blob,"Khmer-Subtitles.srt");await saveLibraryFile("Khmer-Subtitles.srt",blob,"SRT")});
   $("downloadDub").addEventListener("click",async()=>{if(!dubBlob)return;const button=$("downloadDub");button.disabled=true;try{const message=await saveBlobToPhone(dubBlob,"Khmer-AI-Translated-Video.mp4","video/mp4",p=>setStatus("dubStatus","កំពុងរក្សាទុក MP4 ក្នុងទូរសព្ទ "+p+"%..."));const stored=await saveLibraryFile("Khmer-AI-Translated-Video.mp4",dubBlob,"វីដេអូ MP4");setStatus("dubStatus",message+(stored?"\nបានរក្សាទុកច្បាប់ចម្លងក្នុងកម្មវិធីផងដែរ។":""),"good")}catch(e){setStatus("dubStatus","រក្សាទុកវីដេអូមិនបាន៖ "+e.message,"error")}finally{button.disabled=false}});
@@ -253,7 +445,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1
   $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();audioBlob=blob;if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
   $("downloadAudio").addEventListener("click",async()=>{if(audioBlob){downloadBlob(audioBlob,"Khmer-Voice.mp3");await saveLibraryFile("Khmer-Voice.mp3",audioBlob,"សំឡេង MP3")}});
   renderLibrary();
-  checkBackend().catch(()=>{});
+  if(authAccess){fetch(apiUrl("/api/auth/me")).then(r=>r.json()).then(d=>{if(d.ok){authUser=d.user;$("adminNav").style.display=authUser.role==="admin"?"flex":"none";showPanel("backend")}else clearAuth()}).catch(()=>clearAuth())}else showPanel("auth");
+  checkBackend().catch(e=>{$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនទាន់ភ្ជាប់";setStatus("backendStatus","មិនទាន់ភ្ជាប់៖ "+e.message+"។ សូមចុច «រក្សាទុក និងពិនិត្យការភ្ជាប់»។","error")});
 })();
 </script>
 </body>

@@ -25,3 +25,7 @@ Open index.html in a modern browser, or enable GitHub Pages. HTTPS is recommende
 5. Build and test APK on a physical Android phone.
 
 Never commit API keys, passwords, or provider credentials to this public repository.
+
+
+## Secure authentication
+See [AUTH-SETUP-KM.md](AUTH-SETUP-KM.md) for PostgreSQL setup, Render environment variables, login/register, JWT refresh tokens, admin controls, and deployment notes. This feature is developed on `feature/secure-user-auth`; merge it only after configuring a persistent PostgreSQL database and the required secrets.

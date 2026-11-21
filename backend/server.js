@@ -20,6 +20,7 @@
 
 "use strict";
 
+require("express-async-errors");
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
@@ -31,6 +32,7 @@ const { execFile } = require("child_process");
 const { promisify } = require("util");
 const ffmpegPath = process.env.FFMPEG_PATH || require("ffmpeg-static");
 const { EdgeTTS } = require("node-edge-tts");
+const { router: authRouter, authenticate, initializeAuth } = require("./auth");
 require("dotenv").config();
 
 const execFileAsync = promisify(execFile);
@@ -82,6 +84,7 @@ function pruneFinishedJobs(jobs) {
 }
 
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 // APK WebViews may send Origin: null when index.html is loaded from file://.
 // This API uses no cookies or browser credentials, so wildcard CORS is safe here
 // and avoids reflecting the opaque "null" origin back to the Android WebView.
@@ -92,6 +95,7 @@ app.use(cors({
   maxAge: 86400
 }));
 app.use(express.json({ limit: "2mb" }));
+app.use("/api/auth", authRouter);
 
 const upload = multer({
   dest: TMP,
@@ -835,7 +839,7 @@ app.get("/api/health", healthHandler);
 app.get("/health", healthHandler);
 
 // Text translation
-app.post("/api/translate", requireGeminiKey, asyncRoute(async (req, res) => {
+app.post("/api/translate", authenticate, requireGeminiKey, asyncRoute(async (req, res) => {
   const text = String(req.body?.text || "").trim();
   const sourceLanguage = String(req.body?.sourceLanguage || "auto").trim();
   if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទដែលត្រូវបកប្រែ" });
@@ -859,7 +863,7 @@ ${text}`;
 }));
 
 // Khmer speech generation (does not require Gemini API key)
-app.post("/api/tts", asyncRoute(async (req, res) => {
+app.post("/api/tts", authenticate, asyncRoute(async (req, res) => {
   const text = String(req.body?.text || "").trim();
   if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទខ្មែរ" });
   if (text.length > 5000) return res.status(413).json({ ok: false, error: "អត្ថបទវែងពេក (អតិបរមា 5000 តួអក្សរ)" });
@@ -880,7 +884,7 @@ app.post("/api/tts", asyncRoute(async (req, res) => {
 }));
 
 // Analyze video and return translated, timestamped segments
-app.post("/api/video/translate", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+app.post("/api/video/translate", authenticate, requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
   try {
     const result = await analyzeAndTranslateVideo(
@@ -895,7 +899,7 @@ app.post("/api/video/translate", requireGeminiKey, upload.single("video"), async
 }));
 
 // One-step: upload video -> Gemini translate -> Khmer TTS -> dubbed MP4
-app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+app.post("/api/video/translate-and-dub", authenticate, requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
   let result;
   try {
@@ -912,7 +916,7 @@ app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"
 }));
 
 // Asynchronous one-step video translation. The phone polls status instead of holding one long HTTP request open.
-app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+app.post("/api/video/jobs", authenticate, requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
   pruneFinishedJobs(videoJobs);
   if (activeMediaJobId) {
@@ -923,6 +927,7 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
   activeMediaJobId = id;
   const job = {
     id,
+    ownerId: req.user.id,
     status: "processing",
     stage: "queued",
     createdAt: Date.now(),
@@ -970,7 +975,7 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
 }));
 
 // Multi-episode series: translate each episode in order, normalize it, then join into one MP4.
-app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
+app.post("/api/series/jobs", authenticate, requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
   const files = req.files || [];
   pruneFinishedJobs(seriesJobs);
   if (activeMediaJobId) {
@@ -995,7 +1000,7 @@ app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_
   const work = path.join(TMP, "series-" + id);
   await fs.promises.mkdir(work, { recursive: true });
   const job = {
-    id, status: "processing", stage: "queued", createdAt: Date.now(),
+    id, ownerId: req.user.id, status: "processing", stage: "queued", createdAt: Date.now(),
     currentEpisode: 0, totalEpisodes: files.length, episodes: files.map(file => ({
       name: path.basename(file.originalname || "episode.mp4"), status: "queued"
     })),
@@ -1066,9 +1071,9 @@ app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_
   });
 }));
 
-app.get("/api/series/jobs/:id", (req, res) => {
+app.get("/api/series/jobs/:id", authenticate, (req, res) => {
   const job = seriesJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
   res.json({
     ok: true, jobId: job.id, status: job.status, stage: job.stage,
     currentEpisode: job.currentEpisode, totalEpisodes: job.totalEpisodes,
@@ -1076,9 +1081,9 @@ app.get("/api/series/jobs/:id", (req, res) => {
   });
 });
 
-app.get("/api/series/jobs/:id/download", (req, res) => {
+app.get("/api/series/jobs/:id/download", authenticate, (req, res) => {
   const job = seriesJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
   if (job.status !== "completed" || !job.output) {
     return res.status(409).json({ ok: false, error: "រឿងភាគមិនទាន់ភ្ជាប់រួចរាល់ទេ" });
   }
@@ -1098,9 +1103,9 @@ app.get("/api/series/jobs/:id/download", (req, res) => {
   });
 });
 
-app.get("/api/video/jobs/:id", (req, res) => {
+app.get("/api/video/jobs/:id", authenticate, (req, res) => {
   const job = videoJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
   res.json({
     ok: true,
     jobId: job.id,
@@ -1113,9 +1118,9 @@ app.get("/api/video/jobs/:id", (req, res) => {
   });
 });
 
-app.get("/api/video/jobs/:id/download", (req, res) => {
+app.get("/api/video/jobs/:id/download", authenticate, (req, res) => {
   const job = videoJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+  if (!job || job.ownerId !== req.user.id) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
   if (job.status !== "completed" || !job.output) {
     return res.status(409).json({ ok: false, error: "វីដេអូមិនទាន់រួចរាល់ទេ" });
   }
@@ -1138,7 +1143,7 @@ app.get("/api/video/jobs/:id/download", (req, res) => {
 });
 
 // Existing frontend compatibility: client sends video + JSON segments
-app.post("/api/dub", upload.single("video"), asyncRoute(async (req, res) => {
+app.post("/api/dub", authenticate, upload.single("video"), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
   let segments;
   try {
@@ -1178,6 +1183,11 @@ app.use((err, req, res, next) => {
   res.status(status).json({ ok: false, error: khmerMessage, retryable: temporary || quotaLimited });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Khmer AI Translator Pro backend running on port ${PORT}`);
+initializeAuth().then(() => {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Khmer AI Translator Pro backend running on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error("[AUTH] Database initialization failed:", error.message);
+  process.exit(1);
 });
