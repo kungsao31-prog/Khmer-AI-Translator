@@ -747,10 +747,10 @@ async function createDubbedVideo(req, res, segments, options = {}) {
     const khmerFontsDir = "/usr/share/fonts/truetype/noto";
     // Remove the common bottom Chinese subtitle strip before drawing Khmer.
     // delogo interpolates nearby pixels rather than putting a dark caption box.
-    // FFmpeg builds on Render do not all support the optional delogo band parameter.
-    // Keep the same subtitle-cleanup region but use portable delogo options.
-    const subtitleFilter = "delogo=x=0:y=ih*0.78:w=iw:h=ih*0.18:show=0," +
-      "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
+    // Avoid delogo here: FFmpeg delogo expression support varies between builds,
+    // and unsupported frame-size expressions can abort the entire video encode.
+    // Burn Khmer subtitles directly; retain the original picture underneath.
+    const subtitleFilter = "subtitles=filename='" + escapeFfmpegFilterPath(subtitleFile) +
       "':fontsdir='" + escapeFfmpegFilterPath(khmerFontsDir) +
       "':force_style='FontName=Noto Sans Khmer,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=52'";
     try {
