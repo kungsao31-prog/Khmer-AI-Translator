@@ -84,6 +84,7 @@ function pruneFinishedJobs(jobs) {
 }
 
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 // APK WebViews may send Origin: null when index.html is loaded from file://.
 // This API uses no cookies or browser credentials, so wildcard CORS is safe here
 // and avoids reflecting the opaque "null" origin back to the Android WebView.
