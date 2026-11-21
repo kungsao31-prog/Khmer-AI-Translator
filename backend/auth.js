@@ -117,7 +117,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", rateLimitLogin, async (req, res) => {
   if (!REGISTRATION_ENABLED) return res.status(403).json({ ok: false, error: "ការចុះឈ្មោះថ្មីត្រូវបានបិទ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។" });
   const email = cleanEmail(req.body?.email);
   const password = String(req.body?.password || "");
