@@ -58,6 +58,19 @@ jobs:
         run: |
           node --check backend/server.js
           node --check backend/auth.js
+          node - <<'NODE'
+          const fs = require("fs");
+          for (const file of ["index.html", "WWW/index.html"]) {
+            const html = fs.readFileSync(file, "utf8");
+            const match = html.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/);
+            if (!match) throw new Error("Inline JavaScript not found in " + file);
+            const out = "/tmp/" + file.replace(/\\//g, "-") + ".js";
+            fs.writeFileSync(out, match[1]);
+            console.log("Extracted " + file + " -> " + out);
+          }
+          NODE
+          node --check /tmp/index.html.js
+          node --check /tmp/WWW-index.html.js
 
       - name: Build web application
         run: npm run build
