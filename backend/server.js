@@ -683,10 +683,10 @@ async function createDubbedVideo(req, res, segments, options = {}) {
 
     console.log(`[DUB] ${valid.length} subtitle segments grouped into ${voiceJobs.length} Khmer TTS requests`);
     const audioFiles = [];
-    // Two carefully staggered TTS workers shorten total wait time without
-    // flooding the upstream voice service. Set EDGE_TTS_CONCURRENCY=1 to
-    // force sequential processing if the provider starts returning HTTP 429.
-    const ttsConcurrency = Math.max(1, Math.min(3, Number(process.env.EDGE_TTS_CONCURRENCY || 1)));
+    // Two carefully staggered TTS workers shorten total wait time while
+    // keeping requests modest for the free upstream voice service. Set
+    // EDGE_TTS_CONCURRENCY=1 to force sequential processing if HTTP 429 occurs.
+    const ttsConcurrency = Math.max(1, Math.min(2, Number(process.env.EDGE_TTS_CONCURRENCY || 2)));
     for (let offset = 0; offset < voiceJobs.length; offset += ttsConcurrency) {
       const batch = [];
       for (let index = offset; index < Math.min(offset + ttsConcurrency, voiceJobs.length); index++) {
