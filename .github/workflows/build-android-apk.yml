@@ -68,6 +68,27 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
+      - name: Allow HTTP access only for local Android loopback server
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/network_security_config.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+            <domain-config cleartextTrafficPermitted="true">
+              <domain includeSubdomains="false">localhost</domain>
+              <domain includeSubdomains="false">127.0.0.1</domain>
+            </domain-config>
+          </network-security-config>
+          XML
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          if 'android:networkSecurityConfig=' not in s:
+              s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
+          p.write_text(s)
+          PY
+
       - name: Build APK
         working-directory: android
         run: |
