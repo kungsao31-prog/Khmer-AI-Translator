@@ -1,6 +1,15 @@
 name: Build Android APK
 
 on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "WWW/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - ".github/workflows/build-android-apk.yml"
   push:
     branches: ["main"]
     paths:
