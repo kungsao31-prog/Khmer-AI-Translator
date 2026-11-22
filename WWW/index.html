@@ -238,7 +238,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     const cloud=String($("backendUrl").value||"").trim().replace(/\/+$/,"");
     const local=String($("localBackendUrl").value||"").trim().replace(/\/+$/,"");
     if(cloud&&!/^https:\/\//i.test(cloud))throw new Error("Render URL ត្រូវចាប់ផ្តើមដោយ https://");
-    if(local&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\\d+)?$/i.test(local))throw new Error("Local URL ត្រូវជា http://127.0.0.1:3000 ឬ http://localhost:3000");
+    if(local&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(local))throw new Error("Local URL ត្រូវជា http://127.0.0.1:3000 ឬ http://localhost:3000");
     localStorage.setItem("khmerBackendUrl",cloud);
     localStorage.setItem("khmerLocalBackendUrl",local);
     setStatus("backendStatus","កំពុងពិនិត្យ Render Cloud បន្ទាប់មក Local Server..."); 
