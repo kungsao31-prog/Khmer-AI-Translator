@@ -172,7 +172,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
 <script>
 (function(){
   const $=id=>document.getElementById(id);
-  const DEFAULT_URL="https://khmer-ai-translator.onrender.com";
+  const DEFAULT_URL=(location.protocol==="https:"||location.protocol==="http:")?location.origin:"";
   let originalUrl="",dubUrl="",audioUrl="",dubBlob=null,audioBlob=null,segments=[],timer=null,startedAt=0,estimateTimer=null,isVideoProcessing=false;
   const LIB_DB="khmer-ai-translator-library",LIB_STORE="files";
   function openLibrary(){return new Promise((resolve,reject)=>{if(!("indexedDB" in window)){reject(new Error("ទូរសព្ទមិនគាំទ្រកន្លែងរក្សាទុកក្នុងកម្មវិធី"));return}const req=indexedDB.open(LIB_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LIB_STORE))req.result.createObjectStore(LIB_STORE,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error("បើកកន្លែងរក្សាទុកមិនបាន"))})}
@@ -217,8 +217,9 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   document.querySelectorAll(".nav[data-panel]").forEach(b=>b.addEventListener("click",()=>{showPanel(b.dataset.panel);if(b.dataset.panel==="files")renderLibrary()}));
   $("libraryList").addEventListener("click",async e=>{const b=e.target.closest("button[data-action]");if(!b)return;const item=b.closest(".library-item");if(!item)return;try{if(b.dataset.action==="download")await downloadLibraryItem(item.dataset.id);else if(b.dataset.action==="delete"&&confirm("លុបឯកសារនេះចេញពីកម្មវិធី?"))await deleteLibraryItem(item.dataset.id)}catch(err){alert(err.message)}});
   $("homeNav").addEventListener("click",()=>showPanel("backend"));
-  $("backendUrl").value=localStorage.getItem("khmerBackendUrl")||DEFAULT_URL;
-  async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល URL");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");const r=await fetch(u+"/api/health",{method:"GET"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Backend មិនឆ្លើយតប");$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
+  const savedBackendUrl=localStorage.getItem("khmerBackendUrl")||"";
+  $("backendUrl").value=(!savedBackendUrl||savedBackendUrl==="https://khmer-ai-translator.onrender.com")?DEFAULT_URL:savedBackendUrl;
+  async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល Render Backend URL ជាមុន។ URL ត្រូវចាប់ផ្តើមដោយ https://");if(!/^https:\/\//i.test(u))throw new Error("សូមប្រើ HTTPS URL របស់ Render ដែលចាប់ផ្តើមដោយ https://");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");let r;try{r=await fetch(u+"/api/health",{method:"GET",mode:"cors",cache:"no-store",headers:{"Accept":"application/json"}})}catch(error){throw new Error("មិនអាចទៅដល់ Backend បានទេ។ សូមពិនិត្យ Render URL, ស្ថានភាព Deploy និងអ៊ីនធឺណិត។ ("+(error.message||"Network error")+")")}const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||("Backend ឆ្លើយតប HTTP "+r.status));$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
   $("checkBackend").addEventListener("click",async()=>{try{await checkBackend()}catch(e){$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនអាចភ្ជាប់";setStatus("backendStatus","ភ្ជាប់មិនបាន៖ "+e.message,"error")}});
   async function ensureBackend(){if(!$("connectionDot").classList.contains("ok"))await checkBackend()}
 
