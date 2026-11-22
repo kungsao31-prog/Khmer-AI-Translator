@@ -828,7 +828,10 @@ const healthHandler = (req, res) => {
     service: "Khmer AI Translator Pro",
     timestamp: new Date().toISOString(),
     geminiConfigured: Boolean(API_KEY),
-    ffmpegConfigured: Boolean(ffmpegPath)
+    ffmpegConfigured: Boolean(ffmpegPath),
+    groqConfigured: Boolean(String(process.env.GROQ_API_KEY || "").trim()),
+    externalTranslationConfigured: Boolean(String(process.env.AI_API_KEY || process.env.GROQ_API_KEY || "").trim()),
+    enhancementRoutes: true
   });
 };
 app.get("/api/health", healthHandler);
@@ -1150,7 +1153,7 @@ app.post("/api/dub", upload.single("video"), asyncRoute(async (req, res) => {
   await createDubbedVideo(req, res, segments);
 }));
 
-// Multer and general error handler
+// Optional Groq, external AI, merge and thumbnail routes.\nrequire("./enhancements")(app);\n\n// Multer and general error handler
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   if (err instanceof multer.MulterError) {
