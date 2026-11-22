@@ -116,17 +116,25 @@ module.exports = function registerEnhancementRoutes(app) {
       await removeFiles(files.map(f => f.path));
       return res.status(413).json({ ok: false, error: "ទំហំសរុប Batch លើស 500 MB" });
     }
-    const results = [];
-    try {
-      for (const file of files) {
+    const results = new Array(files.length);
+    let nextIndex = 0;
+    async function worker() {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= files.length) return;
+        const file = files[index];
         try {
           const result = await transcribeVideo(file);
-          results.push({ filename: safeName(file.originalname), ok: true, ...result });
+          results[index] = { filename: safeName(file.originalname), ok: true, ...result };
         } catch (error) {
-          results.push({ filename: safeName(file.originalname), ok: false, error: error.message });
+          results[index] = { filename: safeName(file.originalname), ok: false, error: error.message };
         }
       }
-      res.json({ ok: true, total: files.length, completed: results.filter(x => x.ok).length, results });
+    }
+    try {
+      // Two workers balance throughput against free-tier CPU and provider rate limits.
+      await Promise.all(Array.from({ length: Math.min(2, files.length) }, () => worker()));
+      res.json({ ok: true, total: files.length, completed: results.filter(x => x && x.ok).length, results });
     } finally {
       await removeFiles(files.map(f => f.path));
     }
