@@ -108,7 +108,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   <div class="field"><label for="backendUrl">Render Cloud Backend URL</label><input id="backendUrl" type="url" inputmode="url" value="https://khmer-ai-translator.onrender.com" placeholder="https://your-service.onrender.com"></div>
   <div class="field"><label for="localBackendUrl">Android Local Backend URL (Termux)</label><input id="localBackendUrl" type="url" inputmode="url" value="http://127.0.0.1:3000" placeholder="http://127.0.0.1:3000"></div>
   <button class="btn" id="checkBackend">រក្សាទុក និងពិនិត្យ Server ទាំងពីរ</button>
-  <div class="status" id="backendStatus" role="status">សូមចុចពិនិត្យការភ្ជាប់។ API Key សម្ងាត់ត្រូវរក្សាទុកនៅក្នុង Render Environment ប៉ុណ្ណោះ។</div>
+  <div class="status" id="backendStatus" role="status">សូមចុចពិនិត្យការភ្ជាប់។ API Key ត្រូវរក្សាទុកក្នុង Environment របស់ Render ឬ Termux ប៉ុណ្ណោះ។</div>
   <p class="note">មិនត្រូវបញ្ចូល Gemini API Key នៅក្នុងកម្មវិធីទូរសព្ទ ឬបង្ហាញវាលើអេក្រង់ទេ។</p>
 </section>
 
@@ -235,10 +235,10 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     }finally{clearTimeout(timeout)}
   }
   async function checkBackend(){
-    const cloud=String($("backendUrl").value||"").trim().replace(/\\/+$/,"");
-    const local=String($("localBackendUrl").value||"").trim().replace(/\\/+$/,"");
+    const cloud=String($("backendUrl").value||"").trim().replace(/\/+$/,"");
+    const local=String($("localBackendUrl").value||"").trim().replace(/\/+$/,"");
     if(cloud&&!/^https:\/\//i.test(cloud))throw new Error("Render URL ត្រូវចាប់ផ្តើមដោយ https://");
-    if(local&&!/^http:\/\/(127\\.0\\.0\\.1|localhost)(:\\d+)?$/i.test(local))throw new Error("Local URL ត្រូវជា http://127.0.0.1:3000 ឬ http://localhost:3000");
+    if(local&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\\d+)?$/i.test(local))throw new Error("Local URL ត្រូវជា http://127.0.0.1:3000 ឬ http://localhost:3000");
     localStorage.setItem("khmerBackendUrl",cloud);
     localStorage.setItem("khmerLocalBackendUrl",local);
     setStatus("backendStatus","កំពុងពិនិត្យ Render Cloud បន្ទាប់មក Local Server..."); 
@@ -255,7 +255,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
       activeBackendUrl="";
       $("connectionDot").classList.remove("ok");
       $("connectionLabel").textContent="មិនមាន Server";
-      throw new Error(errors.join("\\n")||"សូមបញ្ចូល URL របស់ Server យ៉ាងហោចណាស់មួយ");
+      throw new Error(errors.join("\n")||"សូមបញ្ចូល URL របស់ Server យ៉ាងហោចណាស់មួយ");
     }
     // Prefer a healthy server with its AI key configured; Render remains first when both are ready.
     const selected=healthy.find(item=>item.data.geminiConfigured!==false)||healthy[0];
@@ -279,7 +279,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     const files=Array.from($("seriesFiles").files||[]);
     const total=files.reduce((sum,file)=>sum+file.size,0);
     $("seriesFileList").textContent=files.length
-      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
+      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
       : "មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។";
   });
   $("seriesStart").addEventListener("click",async()=>{
@@ -315,7 +315,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
         const current=Number(job.currentEpisode)||0,totalEpisodes=Number(job.totalEpisodes)||files.length;
         const pct=15+((current?current-1:0)/totalEpisodes)*70;
         setProgress(pct,"កំពុងបកប្រែភាគ "+current+"/"+totalEpisodes+" · "+(job.stage||"processing"),true);
-        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\\n")||"កំពុងដំណើរការ...");
+        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\n")||"កំពុងដំណើរការ...");
         if(job.status==="failed")throw new Error(job.error||"បកប្រែរឿងភាគមិនបាន");
         if(job.status==="completed"){completedJob=job;break}
         await new Promise(resolve=>setTimeout(resolve,5000));
