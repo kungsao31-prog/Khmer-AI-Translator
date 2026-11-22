@@ -551,7 +551,7 @@ async function createDubbedVideo(req, res, segments, options = {}) {
   const validSegments = normalizeSegments({ segments }, 99999);
   if (!validSegments.length) {
     throw new Error("មិនមានឃ្លាបកប្រែត្រឹមត្រូវសម្រាប់បង្កើតសំឡេងទេ");
-  }
+  9}
 
   const work = path.join(TMP, "dub-" + randomUUID());
   await fs.promises.mkdir(work, { recursive: true });
