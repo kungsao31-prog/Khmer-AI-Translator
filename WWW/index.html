@@ -104,10 +104,11 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
 
 <section class="panel active" id="panel-backend">
   <h2>① ការភ្ជាប់ Backend</h2>
-  <p class="sub">រក្សាទុក Render Backend URL និងពិនិត្យសេវា API មុនពេលប្រើ។</p>
-  <div class="field"><label for="backendUrl">Render Backend URL</label><input id="backendUrl" type="url" inputmode="url" value="https://khmer-ai-translator.onrender.com" placeholder="https://your-service.onrender.com"></div>
-  <button class="btn" id="checkBackend">រក្សាទុក និងពិនិត្យការភ្ជាប់</button>
-  <div class="status" id="backendStatus" role="status">សូមចុចពិនិត្យការភ្ជាប់។ API Key សម្ងាត់ត្រូវរក្សាទុកនៅក្នុង Render Environment ប៉ុណ្ណោះ។</div>
+  <p class="sub">ភ្ជាប់ Render Cloud ជាចម្បង និងប្ដូរទៅ Local Server ក្នុងទូរសព្ទ ប្រសិនបើ Cloud មិនឆ្លើយតប។</p>
+  <div class="field"><label for="backendUrl">Render Cloud Backend URL</label><input id="backendUrl" type="url" inputmode="url" value="https://khmer-ai-translator.onrender.com" placeholder="https://your-service.onrender.com"></div>
+  <div class="field"><label for="localBackendUrl">Android Local Backend URL (Termux)</label><input id="localBackendUrl" type="url" inputmode="url" value="http://127.0.0.1:3000" placeholder="http://127.0.0.1:3000"></div>
+  <button class="btn" id="checkBackend">រក្សាទុក និងពិនិត្យ Server ទាំងពីរ</button>
+  <div class="status" id="backendStatus" role="status">សូមចុចពិនិត្យការភ្ជាប់។ API Key ត្រូវរក្សាទុកក្នុង Environment របស់ Render ឬ Termux ប៉ុណ្ណោះ។</div>
   <p class="note">មិនត្រូវបញ្ចូល Gemini API Key នៅក្នុងកម្មវិធីទូរសព្ទ ឬបង្ហាញវាលើអេក្រង់ទេ។</p>
 </section>
 
@@ -172,7 +173,9 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
 <script>
 (function(){
   const $=id=>document.getElementById(id);
-  const DEFAULT_URL=(location.protocol==="https:"||location.protocol==="http:")?location.origin:"";
+  // Capacitor Android uses https://localhost as its WebView origin. Never treat that as the API server.
+  const DEFAULT_URL="";
+  let activeBackendUrl="";
   let originalUrl="",dubUrl="",audioUrl="",dubBlob=null,audioBlob=null,segments=[],timer=null,startedAt=0,estimateTimer=null,isVideoProcessing=false;
   const LIB_DB="khmer-ai-translator-library",LIB_STORE="files";
   function openLibrary(){return new Promise((resolve,reject)=>{if(!("indexedDB" in window)){reject(new Error("ទូរសព្ទមិនគាំទ្រកន្លែងរក្សាទុកក្នុងកម្មវិធី"));return}const req=indexedDB.open(LIB_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LIB_STORE))req.result.createObjectStore(LIB_STORE,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error("បើកកន្លែងរក្សាទុកមិនបាន"))})}
@@ -209,7 +212,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     downloadBlob(blob,name);
     return "បានចាប់ផ្តើមទាញយកតាម Browser។ សូមពិនិត្យថត Downloads។";
   }
-  function apiUrl(path){if(!base())throw new Error("សូមបញ្ចូល Render Backend URL ជាមុន");return base()+path}
+  function apiUrl(path){const server=activeBackendUrl||base();if(!server)throw new Error("សូមពិនិត្យ Render ឬ Local Backend ជាមុន");return server+path}
   function startTimer(){stopTimer();startedAt=Date.now();$("elapsedTime").textContent="00:00";timer=setInterval(()=>$("elapsedTime").textContent=fmt((Date.now()-startedAt)/1000),1000)}
   function stopTimer(){if(timer){clearInterval(timer);timer=null}}
   function setProgress(p,label,working){const value=Math.max(0,Math.min(100,Number(p)||0));$("progressBar").style.width=value+"%";$("progressPercent").textContent=Math.round(value)+"%";$("progressLabel").textContent=label;$("progressTrack").classList.toggle("indeterminate",!!working)}
@@ -218,17 +221,65 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   $("libraryList").addEventListener("click",async e=>{const b=e.target.closest("button[data-action]");if(!b)return;const item=b.closest(".library-item");if(!item)return;try{if(b.dataset.action==="download")await downloadLibraryItem(item.dataset.id);else if(b.dataset.action==="delete"&&confirm("លុបឯកសារនេះចេញពីកម្មវិធី?"))await deleteLibraryItem(item.dataset.id)}catch(err){alert(err.message)}});
   $("homeNav").addEventListener("click",()=>showPanel("backend"));
   const savedBackendUrl=localStorage.getItem("khmerBackendUrl")||"";
-  $("backendUrl").value=(!savedBackendUrl||savedBackendUrl==="https://khmer-ai-translator.onrender.com")?DEFAULT_URL:savedBackendUrl;
-  async function checkBackend(){const u=base();if(!u)throw new Error("សូមបញ្ចូល Render Backend URL ជាមុន។ URL ត្រូវចាប់ផ្តើមដោយ https://");if(!/^https:\/\//i.test(u))throw new Error("សូមប្រើ HTTPS URL របស់ Render ដែលចាប់ផ្តើមដោយ https://");localStorage.setItem("khmerBackendUrl",u);setStatus("backendStatus","កំពុងពិនិត្យការភ្ជាប់...");let r;try{r=await fetch(u+"/api/health",{method:"GET",mode:"cors",cache:"no-store",headers:{"Accept":"application/json"}})}catch(error){throw new Error("មិនអាចទៅដល់ Backend បានទេ។ សូមពិនិត្យ Render URL, ស្ថានភាព Deploy និងអ៊ីនធឺណិត។ ("+(error.message||"Network error")+")")}const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||("Backend ឆ្លើយតប HTTP "+r.status));$("connectionDot").classList.add("ok");$("connectionLabel").textContent="Backend ភ្ជាប់ហើយ";setStatus("backendStatus","ភ្ជាប់បានជោគជ័យ។\nសេវា៖ "+(d.service||"Khmer AI Translator Pro")+"\nGemini API៖ "+(d.geminiConfigured?"បានកំណត់":"មិនទាន់កំណត់")+"\nFFmpeg៖ "+(d.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម"),"good");return d}
+  const savedLocalBackendUrl=localStorage.getItem("khmerLocalBackendUrl")||"http://127.0.0.1:3000";
+  $("backendUrl").value=savedBackendUrl||$("backendUrl").value||"https://khmer-ai-translator.onrender.com";
+  $("localBackendUrl").value=savedLocalBackendUrl;
+  async function probeBackend(url,label){
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);
+    try{
+      const response=await fetch(url+"/api/health",{method:"GET",mode:"cors",cache:"no-store",headers:{"Accept":"application/json"},signal:controller.signal});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+      return {url,label,data};
+    }finally{clearTimeout(timeout)}
+  }
+  async function checkBackend(){
+    const cloud=String($("backendUrl").value||"").trim().replace(/\/+$/,"");
+    const local=String($("localBackendUrl").value||"").trim().replace(/\/+$/,"");
+    if(cloud&&!/^https:\/\//i.test(cloud))throw new Error("Render URL ត្រូវចាប់ផ្តើមដោយ https://");
+    if(local&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(local))throw new Error("Local URL ត្រូវជា http://127.0.0.1:3000 ឬ http://localhost:3000");
+    localStorage.setItem("khmerBackendUrl",cloud);
+    localStorage.setItem("khmerLocalBackendUrl",local);
+    setStatus("backendStatus","កំពុងពិនិត្យ Render Cloud បន្ទាប់មក Local Server..."); 
+    const candidates=[];
+    if(cloud)candidates.push({url:cloud,label:"Render Cloud"});
+    if(local)candidates.push({url:local,label:"Android Local (Termux)"});
+    const errors=[];
+    const healthy=[];
+    for(const candidate of candidates){
+      try{healthy.push(await probeBackend(candidate.url,candidate.label));}
+      catch(error){errors.push(candidate.label+": "+(error.name==="AbortError"?"អស់ពេលរង់ចាំ 8 វិនាទី":error.message));}
+    }
+    if(!healthy.length){
+      activeBackendUrl="";
+      $("connectionDot").classList.remove("ok");
+      $("connectionLabel").textContent="មិនមាន Server";
+      throw new Error(errors.join("\n")||"សូមបញ្ចូល URL របស់ Server យ៉ាងហោចណាស់មួយ");
+    }
+    // Prefer a healthy server with its AI key configured; Render remains first when both are ready.
+    const selected=healthy.find(item=>item.data.geminiConfigured!==false)||healthy[0];
+    activeBackendUrl=selected.url;
+    $("connectionDot").classList.add("ok");
+    $("connectionLabel").textContent="បានភ្ជាប់៖ "+selected.label;
+    const ready=selected.data.geminiConfigured!==false;
+    const status="បានភ្ជាប់ទៅ "+selected.label+"។\\n"+
+      "Gemini API៖ "+(ready?"បានកំណត់":"មិនទាន់កំណត់")+
+      "\\nFFmpeg៖ "+(selected.data.ffmpegConfigured?"បានត្រៀម":"មិនទាន់ត្រៀម")+
+      (healthy.length>1?"\\nServer ទាំងពីរឆ្លើយតបបាន។":"")+
+      (errors.length?"\\nServer ដែលមិនឆ្លើយតប៖ "+errors.join(" | "):"");
+    setStatus("backendStatus",status,ready?"good":"error");
+    return selected.data;
+  }
   $("checkBackend").addEventListener("click",async()=>{try{await checkBackend()}catch(e){$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនអាចភ្ជាប់";setStatus("backendStatus","ភ្ជាប់មិនបាន៖ "+e.message,"error")}});
-  async function ensureBackend(){if(!$("connectionDot").classList.contains("ok"))await checkBackend()}
+  async function ensureBackend(){if(!activeBackendUrl||!$("connectionDot").classList.contains("ok"))await checkBackend()}
 
   let seriesBusy=false;
   $("seriesFiles").addEventListener("change",()=>{
     const files=Array.from($("seriesFiles").files||[]);
     const total=files.reduce((sum,file)=>sum+file.size,0);
     $("seriesFileList").textContent=files.length
-      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
+      ? files.map((file,index)=>(index+1)+". "+file.name+" ("+(file.size/1048576).toFixed(1)+" MB)").join("\n")+"\\nសរុប៖ "+(total/1048576).toFixed(1)+" MB"
       : "មិនទាន់ជ្រើសរើសភាគនៅឡើយទេ។";
   });
   $("seriesStart").addEventListener("click",async()=>{
@@ -264,7 +315,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
         const current=Number(job.currentEpisode)||0,totalEpisodes=Number(job.totalEpisodes)||files.length;
         const pct=15+((current?current-1:0)/totalEpisodes)*70;
         setProgress(pct,"កំពុងបកប្រែភាគ "+current+"/"+totalEpisodes+" · "+(job.stage||"processing"),true);
-        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\\n")||"កំពុងដំណើរការ...");
+        setStatus("seriesStatus",job.episodes?.map((episode,index)=>(index+1)+". "+episode.name+" — "+(episode.status==="completed"?"រួចរាល់":episode.status==="processing"?"កំពុងបកប្រែ":"រង់ចាំ")).join("\n")||"កំពុងដំណើរការ...");
         if(job.status==="failed")throw new Error(job.error||"បកប្រែរឿងភាគមិនបាន");
         if(job.status==="completed"){completedJob=job;break}
         await new Promise(resolve=>setTimeout(resolve,5000));
