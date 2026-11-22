@@ -93,6 +93,7 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   <button class="nav" data-panel="video" aria-label="បកប្រែវីដេអូ" title="បកប្រែវីដេអូ">🎬<small>02</small></button>
   <button class="nav" data-panel="text" aria-label="បកប្រែអត្ថបទ" title="បកប្រែអត្ថបទ">✨<small>03</small></button>
   <button class="nav" data-panel="files" aria-label="ឯកសាររបស់ខ្ញុំ" title="ឯកសាររបស់ខ្ញុំ">📁<small>04</small></button>
+  <button class="nav" data-panel="tools" aria-label="ឧបករណ៍ថ្មី" title="Batch, Merge, Thumbnail">🧰<small>Tools</small></button>
   <div class="spacer"></div>
   <button class="nav" id="homeNav" aria-label="ទំព័រដើម">⌂<small>Home</small></button>
 </aside>
@@ -144,6 +145,34 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
     <div class="result-video"><video id="dubPlayer" controls playsinline></video></div>
     <button class="btn" id="downloadDub" disabled>⬇ ទាញយក MP4 ម្ដងទៀត</button>
   </div>
+</section>
+
+<section class="panel" id="panel-tools">
+  <h2>🧰 ឧបករណ៍ថ្មី — Groq / Batch / Merge / Thumbnail</h2>
+  <p class="sub">មុខងារថ្មីប្រើ API Key នៅលើ Server ប៉ុណ្ណោះ។ កុំដាក់ API Key នៅក្នុងទូរសព្ទ។</p>
+  <h3 style="color:#72f1d1">① Groq Batch Transcription</h3>
+  <div class="field"><label for="groqBatchFiles">ជ្រើសរើសវីដេអូច្រើន (អតិបរមា ១០)</label><input id="groqBatchFiles" type="file" accept="video/*" multiple></div>
+  <button class="btn" id="groqBatchStart">⚡ ទាញអត្ថបទដោយ Groq ជា Batch</button>
+  <div class="status" id="groqBatchStatus">ត្រូវកំណត់ GROQ_API_KEY នៅ Server ជាមុន។</div>
+  <div class="field"><label for="groqBatchOutput">លទ្ធផលអត្ថបទ / Transcript</label><textarea id="groqBatchOutput" placeholder="លទ្ធផល Groq នឹងបង្ហាញនៅទីនេះ"></textarea></div>
+  <div class="divider" style="height:1px;background:#28554b;margin:20px 0"></div>
+  <h3 style="color:#72f1d1">② External AI Translation</h3>
+  <div class="field"><label for="externalProvider">AI Provider</label><select id="externalProvider"><option value="groq">Groq (ណែនាំ)</option><option value="external">External OpenAI-compatible API</option></select></div>
+  <div class="field"><label for="externalSource">អត្ថបទដើម</label><textarea id="externalSource" placeholder="ដាក់អត្ថបទចិន ថៃ អង់គ្លេស ឬភាសាផ្សេង..."></textarea></div>
+  <button class="btn" id="externalTranslate">✨ បកប្រែជាភាសាខ្មែរ</button>
+  <div class="field"><label for="externalResult">លទ្ធផលខ្មែរ</label><textarea id="externalResult" placeholder="លទ្ធផលបកប្រែនឹងបង្ហាញនៅទីនេះ"></textarea></div>
+  <div class="divider" style="height:1px;background:#28554b;margin:20px 0"></div>
+  <h3 style="color:#72f1d1">③ Merge Video</h3>
+  <div class="field"><label for="mergeFiles">ជ្រើសរើសវីដេអូ ២–១០ ឯកសារ</label><input id="mergeFiles" type="file" accept="video/*" multiple></div>
+  <button class="btn" id="mergeVideos">🎞️ បញ្ចូលវីដេអូជា MP4 តែមួយ</button>
+  <div class="status" id="mergeStatus">ជ្រើសរើសវីដេអូយ៉ាងតិច ២។ វីដេអូនឹងត្រូវ normalize មុន merge។</div>
+  <div class="divider" style="height:1px;background:#28554b;margin:20px 0"></div>
+  <h3 style="color:#72f1d1">④ Thumbnail Generator</h3>
+  <div class="field"><label for="thumbnailFile">ជ្រើសរើសវីដេអូ</label><input id="thumbnailFile" type="file" accept="video/*"></div>
+  <div class="field"><label for="thumbnailTime">ពេលវេលា (វិនាទី)</label><input id="thumbnailTime" type="number" min="0" step="0.5" value="1"></div>
+  <button class="btn" id="makeThumbnail">🖼️ បង្កើត Thumbnail JPG</button>
+  <div class="status" id="thumbnailStatus">រូប Thumbnail នឹងទាញយកជា JPG។</div>
+  <img id="thumbnailPreview" class="hidden" alt="Video thumbnail preview" style="display:block;max-width:100%;border-radius:14px;margin-top:12px">
 </section>
 
 <section class="panel" id="panel-files">
@@ -386,6 +415,73 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   $("translateText").addEventListener("click",async()=>{const t=$("sourceText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូលអត្ថបទដើមជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបកប្រែអត្ថបទ...");const r=await fetch(apiUrl("/api/translate"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,sourceLanguage:$("textLanguage").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"បកប្រែមិនបាន");$("khmerText").value=d.translation||d.translatedText||"";setStatus("textStatus","បកប្រែអត្ថបទរួចរាល់។","good")}catch(e){setStatus("textStatus","បកប្រែមិនបាន៖ "+e.message,"error")}});
   $("createTts").addEventListener("click",async()=>{const t=$("khmerText").value.trim();if(!t){setStatus("textStatus","សូមបញ្ចូល ឬបកប្រែអត្ថបទខ្មែរជាមុន។","error");return}try{await ensureBackend();setStatus("textStatus","កំពុងបង្កើតសំឡេងខ្មែរ MP3...");const r=await fetch(apiUrl("/api/tts"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t,gender:$("textVoice").value})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"បង្កើតសំឡេងមិនបាន")}const blob=await r.blob();audioBlob=blob;if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(blob);$("audioPreview").src=audioUrl;$("audioPreview").classList.remove("hidden");$("downloadAudio").disabled=false;setStatus("បង្កើតសំឡេងខ្មែរ MP3 រួចរាល់។","good")}catch(e){setStatus("បង្កើតសំឡេងមិនបាន៖ "+e.message,"error")}});
   $("downloadAudio").addEventListener("click",async()=>{if(audioBlob){downloadBlob(audioBlob,"Khmer-Voice.mp3");await saveLibraryFile("Khmer-Voice.mp3",audioBlob,"សំឡេង MP3")}});
+  // New tools: Groq batch transcription, external AI translation, merge and thumbnail.
+  async function postFiles(path, fieldName, files, extra = {}) {
+    const form = new FormData();
+    Array.from(files || []).forEach(file => form.append(fieldName, file, file.name));
+    Object.entries(extra).forEach(([key,value]) => form.append(key, String(value)));
+    const response = await fetch(apiUrl(path), { method: "POST", body: form });
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || ("Server error " + response.status)); }
+    return response;
+  }
+  $("groqBatchStart").addEventListener("click", async () => {
+    const files = Array.from($("groqBatchFiles").files || []);
+    if (!files.length || files.length > 10) { setStatus("groqBatchStatus","សូមជ្រើសរើសវីដេអូពី ១ ដល់ ១០។","error"); return; }
+    const button=$("groqBatchStart"); button.disabled=true;
+    try {
+      await ensureBackend();
+      setStatus("groqBatchStatus","កំពុងផ្ទុក និងទាញអត្ថបទដោយ Groq...");
+      const response=await postFiles("/api/groq/batch-transcribe","videos",files);
+      const data=await response.json();
+      $("groqBatchOutput").value=(data.results||[]).map((item,index)=>"### "+(index+1)+". "+item.filename+"\n"+(item.ok?item.text:item.error)).join("\n\n");
+      setStatus("groqBatchStatus","បានដំណើរការ "+(data.completed||0)+"/"+(data.total||files.length)+" វីដេអូ។","good");
+    } catch(error) { setStatus("groqBatchStatus","មានបញ្ហា៖ "+error.message,"error"); }
+    finally { button.disabled=false; }
+  });
+  $("externalTranslate").addEventListener("click",async()=>{
+    const text=$("externalSource").value.trim();
+    if(!text){setStatus("mergeStatus","សូមបញ្ចូលអត្ថបទដើមជាមុន។","error");return}
+    const button=$("externalTranslate");button.disabled=true;
+    try{
+      await ensureBackend();
+      const response=await fetch(apiUrl("/api/ai/translate"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,sourceLanguage:"auto",provider:$("externalProvider").value})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.ok)throw new Error(data.error||"AI បកប្រែមិនបាន");
+      $("externalResult").value=data.translation||"";
+    }catch(error){$("externalResult").value="";alert("បកប្រែមិនបាន៖ "+error.message)}
+    finally{button.disabled=false}
+  });
+  $("mergeVideos").addEventListener("click",async()=>{
+    const files=Array.from($("mergeFiles").files||[]);
+    if(files.length<2||files.length>10){setStatus("mergeStatus","សូមជ្រើសរើសវីដេអូពី ២ ដល់ ១០។","error");return}
+    const button=$("mergeVideos");button.disabled=true;
+    try{
+      await ensureBackend();setStatus("mergeStatus","កំពុងបញ្ចូលវីដេអូ... សូមរង់ចាំ។");
+      const response=await postFiles("/api/video/merge","videos",files);
+      const blob=await response.blob();if(blob.size<1024)throw new Error("ឯកសារ MP4 មិនពេញលេញ");
+      const message=await saveBlobToPhone(blob,"Khmer-Merged-Video.mp4","video/mp4");
+      await saveLibraryFile("Khmer-Merged-Video.mp4",blob,"Merged MP4");
+      setStatus("mergeStatus","បញ្ចូលវីដេអូរួចរាល់។ "+message,"good");
+    }catch(error){setStatus("mergeStatus","Merge មិនបាន៖ "+error.message,"error")}
+    finally{button.disabled=false}
+  });
+  $("makeThumbnail").addEventListener("click",async()=>{
+    const file=$("thumbnailFile").files[0];
+    if(!file){setStatus("thumbnailStatus","សូមជ្រើសរើសវីដេអូជាមុន។","error");return}
+    const button=$("makeThumbnail");button.disabled=true;
+    try{
+      await ensureBackend();
+      const response=await postFiles("/api/video/thumbnail","video",[file],{timeSeconds:$("thumbnailTime").value||1});
+      const blob=await response.blob();if(blob.size<100)throw new Error("Thumbnail ទទេ");
+      const url=URL.createObjectURL(blob);const preview=$("thumbnailPreview");
+      if(preview.dataset.url)URL.revokeObjectURL(preview.dataset.url);
+      preview.dataset.url=url;preview.src=url;preview.classList.remove("hidden");
+      downloadBlob(blob,"Khmer-Thumbnail.jpg");await saveLibraryFile("Khmer-Thumbnail.jpg",blob,"Thumbnail JPG");
+      setStatus("បង្កើត Thumbnail រួចរាល់។","good");
+    }catch(error){setStatus("បង្កើត Thumbnail មិនបាន៖ "+error.message,"error")}
+    finally{button.disabled=false}
+  });
+
   renderLibrary();
   checkBackend().catch(e=>{$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនទាន់ភ្ជាប់";setStatus("backendStatus","មិនទាន់ភ្ជាប់៖ "+e.message+"។ សូមចុច «រក្សាទុក និងពិនិត្យការភ្ជាប់»។","error")});
 })();

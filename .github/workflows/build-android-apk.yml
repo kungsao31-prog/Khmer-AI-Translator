@@ -1,6 +1,15 @@
 name: Build Android APK
 
 on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "WWW/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - ".github/workflows/build-android-apk.yml"
   push:
     branches: ["main"]
     paths:
@@ -34,6 +43,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Check backend JavaScript syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/enhancements.js
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -54,7 +68,7 @@ jobs:
           "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Install project dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --prefer-offline
 
       - name: Build web assets
         run: npm run build
