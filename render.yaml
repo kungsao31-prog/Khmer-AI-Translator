@@ -14,9 +14,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_TEXT_MODEL
-        value: gemini-2.5-flash
-      - key: GEMINI_TTS_MODEL
-        value: gemini-2.5-flash-preview-tts
+        value: gemini-3.8-flash
+      - key: GEMINI_VIDEO_MODEL
+        value: gemini-3.8-flash
       - key: MAX_VIDEO_MB
         value: 200
       - key: MAX_SERIES_TOTAL_MB
