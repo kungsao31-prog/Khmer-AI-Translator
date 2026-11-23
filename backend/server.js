@@ -1,333 +1,4 @@
-/**
- * Khmer AI Translator Pro - Backend
- * Node.js 20+
- */
-
-"use strict";
-
-const express = require("express");
-const cors = require("cors");
-const multer = require("multer");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { randomUUID } = require("crypto");
-const { execFile } = require("child_process");
-const { promisify } = require("util");
-const ffmpegPath = process.env.FFMPEG_PATH || require("ffmpeg-static");
-const { EdgeTTS } = require("node-edge-tts");
-require("dotenv").config();
-
-const execFileAsync = promisify(execFile);
-const app = express();
-
-const PORT = Number(process.env.PORT || 3000);
-const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
-const API_KEY_INVALID_CHAR = [...API_KEY].findIndex(char => {
-  const code = char.codePointAt(0);
-  return code < 0x21 || code > 0x7E;
-});
-
-const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
-const VIDEO_MODEL = process.env.GEMINI_VIDEO_MODEL || TEXT_MODEL;
-const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-2.5-flash,gemini-2.5-flash-lite")
-  .split(",").map(value => value.trim()).filter(Boolean);
-
-const GEMINI_RETRY_ATTEMPTS = Math.max(1, Math.min(4, Number(process.env.GEMINI_RETRY_ATTEMPTS || 2)));
-const GEMINI_RETRY_BASE_MS = Math.max(500, Math.min(10000, Number(process.env.GEMINI_RETRY_BASE_MS || 1200)));
-const MAX_VIDEO_MB = Math.max(1, Math.min(200, Number(process.env.MAX_VIDEO_MB || 200)));
-const MAX_TEXT_CHARS = Math.max(1000, Number(process.env.MAX_TEXT_CHARS || 12000));
-const TTS_CONCURRENCY = Math.max(1, Math.min(6, Number(process.env.TTS_CONCURRENCY || 3)));
-
-const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
-
-fs.mkdirSync(TMP, { recursive: true });
-
-const videoJobs = new Map();
-const seriesJobs = new Map();
-let activeMediaJobId = null;
-const JOB_RETENTION_MS = 30 * 60 * 1000;
-
-function pruneFinishedJobs(jobs) {
-  const now = Date.now();
-  for (const [id, job] of jobs) {
-    if (!job.finishedAt || now - job.finishedAt < JOB_RETENTION_MS) continue;
-    if (job.input) fs.promises.unlink(job.input).catch(() => {});
-    for (const input of job.inputFiles || []) fs.promises.unlink(input).catch(() => {});
-    if (job.work) fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
-    jobs.delete(id);
-  }
-}
-
-const cleanupTimer = setInterval(() => {
-  pruneFinishedJobs(videoJobs);
-  pruneFinishedJobs(seriesJobs);
-}, 5 * 60 * 1000);
-cleanupTimer.unref();
-
-app.disable("x-powered-by");
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  maxAge: 86400
-}));
-app.use(express.json({ limit: "2mb" }));
-
-const upload = multer({
-  dest: TMP,
-  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 1 }
-});
-const seriesUpload = multer({
-  dest: TMP,
-  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 20 }
-});
-const MAX_SERIES_FILES = 20;
-const MAX_SERIES_TOTAL_MB = Math.max(1, Math.min(200, Number(process.env.MAX_SERIES_TOTAL_MB || 200)));
-
-function asyncRoute(handler) {
-  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
-}
-
-function requireGeminiKey(req, res, next) {
-  if (!API_KEY) {
-    return res.status(503).json({
-      ok: false,
-      error: "មិនទាន់កំណត់ GEMINI_API_KEY នៅក្នុង Environment"
-    });
-  }
-  if (API_KEY_INVALID_CHAR !== -1) {
-    const badChar = [...API_KEY][API_KEY_INVALID_CHAR];
-    console.error(`[CONFIG] GEMINI_API_KEY contains non-ASCII char at ${API_KEY_INVALID_CHAR} (U+${badChar.codePointAt(0).toString(16).toUpperCase()})`);
-    return res.status(503).json({
-      ok: false,
-      error: "GEMINI_API_KEY មានតួអក្សរខ្មែរ ឬតួអក្សរមិនត្រឹមត្រូវ។ សូមដាក់ API Key ស្អាតពី Google AI Studio។"
-    });
-  }
-  next();
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function getGeminiText(data) {
-  return (data?.candidates?.[0]?.content?.parts || [])
-    .filter(part => typeof part.text === "string")
-    .map(part => part.text)
-    .join("\n")
-    .trim();
-}
-
-class GeminiApiError extends Error {
-  constructor(message, status = 0, apiStatus = "") {
-    super(message);
-    this.name = "GeminiApiError";
-    this.status = status;
-    this.apiStatus = apiStatus;
-  }
-}
-
-function isQuotaOrRateLimitError(error) {
-  const message = String(error?.message || "").toLowerCase();
-  return Number(error?.status) === 429 ||
-    String(error?.apiStatus || "").toUpperCase() === "RESOURCE_EXHAUSTED" ||
-    /quota|rate.?limit|too many requests|resource.?exhausted/.test(message);
-}
-
-function isDailyQuotaError(error) {
-  const message = String(error?.message || "").toLowerCase();
-  return /per[_\\s-]?day|daily|requests per day|quota.{0,40}day|day.{0,40}quota/.test(message);
-}
-
-function isTemporaryGeminiError(error) {
-  const message = String(error?.message || "").toLowerCase();
-  return [0, 408, 500, 502, 503, 504].includes(Number(error?.status)) ||
-    /high demand|overloaded|temporarily unavailable|try again later/.test(message);
-}
-
-async function geminiGenerateOnce(model, contents, generationConfig = {}) {
-  const url = `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`;
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": API_KEY
-      },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.2,
-          ...generationConfig
-        }
-      })
-    });
-  } catch (error) {
-    throw new GeminiApiError("មិនអាចភ្ជាប់ទៅសេវា Gemini បានទេ: " + error.message, 0);
-  }
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new GeminiApiError(
-      data?.error?.message || `Gemini API request failed (${response.status})`,
-      response.status,
-      data?.error?.status || ""
-    );
-  }
-
-  const text = getGeminiText(data);
-  if (!text) throw new GeminiApiError("Gemini មិនបានផ្ញើអត្ថបទត្រឡប់មកវិញ", 502);
-  return text;
-}
-
-async function geminiGenerate(model, contents, generationConfig = {}) {
-  const models = [...new Set([model, ...FALLBACK_MODELS].filter(Boolean))];
-  let lastError;
-  for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
-    const selectedModel = models[modelIndex];
-    for (let attempt = 1; attempt <= GEMINI_RETRY_ATTEMPTS; attempt++) {
-      try {
-        return await geminiGenerateOnce(selectedModel, contents, generationConfig);
-      } catch (error) {
-        lastError = error;
-        if (isQuotaOrRateLimitError(error)) {
-          const daily = isDailyQuotaError(error);
-          throw new GeminiApiError(
-            daily
-              ? "កូតា Gemini ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ។"
-              : "Gemini បានកំណត់ចំនួនសំណើ (HTTP 429)។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។",
-            Number(error.status) || 429,
-            error.apiStatus
-          );
-        }
-        const temporary = isTemporaryGeminiError(error);
-        if (temporary && attempt < GEMINI_RETRY_ATTEMPTS) {
-          const delay = GEMINI_RETRY_BASE_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 250);
-          await sleep(delay);
-          continue;
-        }
-        if (!temporary || modelIndex === models.length - 1) throw error;
-        break;
-      }
-    }
-  }
-  throw lastError || new Error("សេវា Gemini មិនអាចដំណើរការបានទេ");
-}
-
-function stripJsonFence(text) {
-  return String(text)
-    .replace(/^\s*```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/i, "")
-    .trim();
-}
-
-function repairInvalidJsonEscapes(text) {
-  let output = "";
-  let inString = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (!inString) {
-      output += ch;
-      if (ch === '"') inString = true;
-      continue;
-    }
-    if (ch === '"') {
-      output += ch;
-      inString = false;
-      continue;
-    }
-    if (ch !== "\\") {
-      output += ch;
-      continue;
-    }
-    const next = text[i + 1];
-    if (next && '"\\/bfnrt'.includes(next)) {
-      output += ch + next;
-      i++;
-      continue;
-    }
-    if (next === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))) {
-      output += text.slice(i, i + 6);
-      i += 5;
-      continue;
-    }
-    output += "\\\\";
-  }
-  return output;
-}
-
-function parseJsonObject(text) {
-  const cleaned = stripJsonFence(text);
-  for (const candidate of [cleaned, repairInvalidJsonEscapes(cleaned)]) {
-    try {
-      return JSON.parse(candidate);
-    } catch (_) {
-      const first = candidate.indexOf("{");
-      const last = candidate.lastIndexOf("}");
-      if (first >= 0 && last > first) {
-        try {
-          return JSON.parse(candidate.slice(first, last + 1));
-        } catch (_) {}
-      }
-    }
-  }
-  throw new Error("Gemini បានផ្ញើ JSON មិនត្រឹមត្រូវ។ សូមសាកល្បងម្ដងទៀត។");
-}
-
-function getMimeType(file) {
-  const ext = path.extname(file.originalname || "").toLowerCase();
-  const map = {
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".webm": "video/webm",
-    ".mkv": "video/x-matroska",
-    ".avi": "video/x-msvideo",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".m4a": "audio/mp4"
-  };
-  return file.mimetype && file.mimetype !== "application/octet-stream"
-    ? file.mimetype
-    : (map[ext] || "video/mp4");
-}
-
-async function uploadGeminiFile(filePath, mimeType, displayName) {
-  const stat = await fs.promises.stat(filePath);
-  const start = await fetch(`${GEMINI_BASE.replace("/v1beta", "")}/upload/v1beta/files`, {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": API_KEY,
-      "Content-Type": "application/json",
-      "X-Goog-Upload-Protocol": "resumable",
-      "X-Goog-Upload-Command": "start",
-      "X-Goog-Upload-Header-Content-Length": String(stat.size),
-      "X-Goog-Upload-Header-Content-Type": mimeType
-    },
-    body: JSON.stringify({ file: { display_name: displayName } })
   });
-
-  if (!start.ok) {
-    const data = await start.json().catch(() => ({}));
-    throw new Error(data?.error?.message || `Gemini upload start failed (${start.status})`);
-  }
-
-  const uploadUrl = start.headers.get("x-goog-upload-url");
-  if (!uploadUrl) throw new Error("Gemini មិនបានផ្ដល់ Upload URL");
-
-  const finish = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      "Content-Length": String(stat.size),
-      "X-Goog-Upload-Offset": "0",
-      "X-Goog-Upload-Command": "upload, finalize"
-    },
-    body: fs.createReadStream(filePath),
-    duplex: "half"
-  });
-
   const uploaded = await finish.json().catch(() => ({}));
   if (!finish.ok) {
     throw new Error(uploaded?.error?.message || `Gemini upload failed (${finish.status})`);
@@ -545,33 +216,78 @@ async function runWithConcurrency(items, limit, worker) {
   const runners = Array.from({ length: Math.min(limit, items.length) }, () => next());
   await Promise.all(runners);
   return results;
-}
-
-async function createDubbedVideo(req, res, segments, options = {}) {
+    }    body: fs.createReadStream(filePath),
+    duplex: "half"
+  });async function createDubbedVideo(req, res, segments, options = {}) {
   const validSegments = normalizeSegments({ segments }, 99999);
-  if (!validSegments.length) {
-    throw new Error("មិនមានឃ្លាបកប្រែត្រឹមត្រូវសម្រាប់បង្កើតសំឡេងទេ");
-  }
+  if (!validSegments.length) throw new Error("មិនមានឃ្លាបកប្រែត្រឹមត្រូវសម្រាប់បង្កើតសំឡេងទេ");
+
+  const inputPath = options.inputPath || req?.file?.path || req?.file?.file?.path;
+  if (!inputPath) throw new Error("រកមិនឃើញឯកសារវីដេអូដើមសម្រាប់បញ្ចូលសំឡេងទេ");
 
   const work = path.join(TMP, "dub-" + randomUUID());
   await fs.promises.mkdir(work, { recursive: true });
   const output = path.join(work, "khmer-video-dub.mp4");
-  const fallbackGender = req.body?.gender || "female";
-  const style = req.body?.style || "cinematic";
+  const fallbackGender = req?.body?.gender || "female";
+  const style = req?.body?.style || "cinematic";
+  const keepOriginalAudio = String(req?.body?.keepOriginalAudio ?? "false") === "true";
+  const voiceVolume = Math.max(0, Math.min(2, Number(req?.body?.voiceVolume ?? 1)));
 
   try {
     const segFiles = await runWithConcurrency(validSegments, TTS_CONCURRENCY, async (seg, idx) => {
-      const segMp3 = path.join(work, `seg-${String(idx).padStart(4, "0")}.mp3`);
+      const segMp3 = path.join(work, `seg-${String(idx).padStart(5, "0")}.mp3`);
       await synthesizeKhmer(seg.translation, seg.gender || fallbackGender, segMp3, seg.emotion, style);
       return { ...seg, mp3: segMp3 };
     });
 
-    const listPath = path.join(work, "concat.txt");
-    const listLines = segFiles.map(s => `file '${s.mp3.replace(/'/g, "'\\''")}'`).join("\n") + "\n";
-    await fs.promises.writeFile(listPath, listLines, "utf8");
+    const sourceDuration = await videoDuration(inputPath);
+    const inputs = ["-y", "-i", inputPath];
+    for (const segment of segFiles) inputs.push("-i", segment.mp3);
 
-    const mergedVoice = path.join(work, "khmer-narration.mp3");
-    await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy"app.get("/", (req, res) => {
+    const filters = [];
+    const voiceLabels = [];
+    segFiles.forEach((segment, index) => {
+      const delayMs = Math.max(0, Math.round(segment.start * 1000));
+      const label = `voice${index}`;
+      filters.push(`[${index + 1}:a]volume=${voiceVolume},adelay=${delayMs}|${delayMs}[${label}]`);
+      voiceLabels.push(`[${label}]`);
+    });
+
+    const mixInputs = [];
+    if (keepOriginalAudio) mixInputs.push("[0:a]");
+    mixInputs.push(...voiceLabels);
+    filters.push(`${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=longest:dropout_transition=0:normalize=0,apad=whole_dur=${Math.max(1, sourceDuration)}[aout]`);
+
+    await runFfmpeg([
+      ...inputs,
+      "-filter_complex", filters.join(";"),
+      "-map", "0:v:0", "-map", "[aout]",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+      "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2",
+      "-t", String(Math.max(1, sourceDuration)), "-movflags", "+faststart", output
+    ]);
+
+    const stat = await fs.promises.stat(output);
+    if (!stat.size) throw new Error("FFmpeg មិនបានបង្កើតវីដេអូ MP4 ទេ");
+    if (options.returnFile) return { output, work, size: stat.size };
+    if (!res) throw new Error("មិនមាន response សម្រាប់ផ្ញើវីដេអូត្រឡប់ទេ");
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", String(stat.size));
+    res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(output, error => {
+      fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+      if (error && !res.headersSent) res.status(500).json({ ok: false, error: "ផ្ញើឯកសារ MP4 មិនបានទេ" });
+    });
+    return { output, work, size: stat.size };
+  } catch (error) {
+    await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "index.html"), error => {
     if (error && !res.headersSent) {
       res.status(200).send("Khmer AI Translator Pro backend is running.");
@@ -613,66 +329,122 @@ ${text}`;
 
   res.json({ ok: true, sourceLanguage, translation });
 }));
+app.post("/api/tts", asyncRoute(async (req, res) => {  const text = String(req.body?.text || "").trim();
 
-app.post("/api/tts", asyncRoute(async (req, res) => {
-  const text = String(req.body?.text || "").trim();
-  if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទខ្មែរ" });
-  if (text.length > 5000) return res.status(413).json({ ok: false, error: "អត្ថបទវែងពេក (អតិបរមា 5000 តួអក្សរ)" });
+  if (!text) {
+    return res.status(400).json({
+      ok: false,
+      error: "សូមបញ្ចូលអត្ថបទខ្មែរ"
+    });
+  }
+
+  if (text.length > 5000) {
+    return res.status(413).json({
+      ok: false,
+      error: "អត្ថបទវែងពេក"
+    });
+  }
 
   const output = path.join(TMP, `${randomUUID()}.mp3`);
+
   try {
-    await synthesizeKhmer(text, req.body?.gender, output, req.body?.emotion || "neutral", req.body?.style || "cinematic");
+    await synthesizeKhmer(
+      text,
+      req.body?.gender,
+      output,
+      req.body?.emotion || "neutral",
+      req.body?.style || "cinematic"
+    );
+
     res.type("audio/mpeg");
-    res.setHeader("Content-Disposition", 'attachment; filename="khmer-voice.mp3"');
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="khmer-voice.mp3"'
+    );
+
     res.sendFile(output, error => {
       fs.promises.unlink(output).catch(() => {});
-      if (error && !res.headersSent) res.status(500).end();
+
+      if (error && !res.headersSent) {
+        res.status(500).end();
+      }
     });
+
   } catch (error) {
     await fs.promises.unlink(output).catch(() => {});
     throw error;
   }
-}));
+}));app.post("/api/video/translate", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      ok: false,
+      error: "សូមជ្រើសរើសវីដេអូ"
+    });
+  }
 
-app.post("/api/video/translate", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
-  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
   try {
     const result = await analyzeAndTranslateVideo(
       req.file.path,
       getMimeType(req.file),
       req.file.originalname
     );
-    res.json({ ok: true, ...result });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+
   } finally {
     await fs.promises.unlink(req.file.path).catch(() => {});
   }
 }));
 
 app.post("/api/video/translate-and-dub", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
-  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
+  if (!req.file) {
+    return res.status(400).json({
+      ok: false,
+      error: "សូមជ្រើសរើសវីដេអូ"
+    });
+  }
+
   try {
     const result = await analyzeAndTranslateVideo(
       req.file.path,
       getMimeType(req.file),
       req.file.originalname
     );
-    if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
-    await createDubbedVideo(req, res, result.segments);
-  } catch (error) {
-    await fs.promises.unlink(req.file.path).catch(() => {});
-    throw error;
-  }
-}));
 
-app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
-  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
+    if (!result.segments.length) {
+      throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
+    }
+
+    await createDubbedVideo(req, res, result.segments);
+
+  } finally {
+    await fs.promises.unlink(req.file.path).catch(() => {});
+  }
+}));app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      ok: false,
+      error: "សូមជ្រើសរើសវីដេអូ"
+    });
+  }
+
   pruneFinishedJobs(videoJobs);
+
   if (activeMediaJobId) {
     await fs.promises.unlink(req.file.path).catch(() => {});
-    return res.status(409).json({ ok: false, error: "មានការងារវីដេអូមួយកំពុងដំណើរការ។ សូមរង់ចាំឱ្យវាចប់សិន។" });
+    return res.status(409).json({
+      ok: false,
+      error: "មានការងារវីដេអូកំពុងដំណើរការ សូមរង់ចាំ"
+    });
   }
+
   const id = randomUUID();
   activeMediaJobId = id;
+
   const job = {
     id,
     status: "processing",
@@ -684,20 +456,41 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
     error: null,
     size: 0
   };
+
   videoJobs.set(id, job);
-  res.status(202).json({ ok: true, jobId: id, status: job.status });
+
+  res.status(202).json({
+    ok: true,
+    jobId: id,
+    status: job.status
+  });
 
   setImmediate(async () => {
     try {
       job.stage = "analyzing_video";
+
       const result = await analyzeAndTranslateVideo(
         req.file.path,
         getMimeType(req.file),
         req.file.originalname
       );
-      if (!result.segments.length) throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
+
+      if (!result.segments.length) {
+        throw new Error("រកមិនឃើញសំឡេងនិយាយក្នុងវីដេអូ");
+      }
+
       job.stage = "creating_khmer_voice_and_mp4";
-      const built = await createDubbedVideo(req, null, result.segments, { returnFile: true });
+
+      const built = await createDubbedVideo(
+        req,
+        null,
+        result.segments,
+        {
+          returnFile: true,
+          inputPath: req.file.path
+        }
+      );
+
       job.output = built.output;
       job.work = built.work;
       job.size = built.size;
@@ -706,145 +499,38 @@ app.post("/api/video/jobs", requireGeminiKey, upload.single("video"), asyncRoute
       job.stage = "completed";
       job.status = "completed";
       job.finishedAt = Date.now();
-      if (activeMediaJobId === id) activeMediaJobId = null;
+
     } catch (error) {
       job.status = "failed";
       job.stage = "failed";
-      job.error = String(error?.message || "ដំណើរការវីដេអូមិនបាន");
+      job.error = String(error?.message || error);
       job.finishedAt = Date.now();
-      if (activeMediaJobId === id) activeMediaJobId = null;
+
       await fs.promises.unlink(job.input).catch(() => {});
-      if (job.work) await fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
-    }
-  });
-}));
 
-app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
-  const files = req.files || [];
-  pruneFinishedJobs(seriesJobs);
-  if (activeMediaJobId) {
-    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
-    return res.status(409).json({ ok: false, error: "មានការងារវីដេអូមួយកំពុងដំណើរការ។ សូមរង់ចាំឱ្យវាចប់សិន។" });
-  }
-  if (files.length < 2) {
-    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
-    return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសយ៉ាងតិច ២ ភាគ" });
-  }
-  if (files.length > MAX_SERIES_FILES) {
-    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
-    return res.status(400).json({ ok: false, error: "អាចជ្រើសរើសបានអតិបរមា ២០ ភាគ" });
-  }
-  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-  if (totalBytes > MAX_SERIES_TOTAL_MB * 1024 * 1024) {
-    await Promise.all(files.map(file => fs.promises.unlink(file.path).catch(() => {})));
-    return res.status(413).json({ ok: false, error: `ទំហំសរុបរឿងភាគលើស ${MAX_SERIES_TOTAL_MB} MB។` });
-  }
-
-  const id = randomUUID();
-  activeMediaJobId = id;
-  const work = path.join(TMP, "series-" + id);
-  await fs.promises.mkdir(work, { recursive: true });
-  const job = {
-    id, status: "processing", stage: "queued", createdAt: Date.now(),
-    currentEpisode: 0, totalEpisodes: files.length,
-    episodes: files.map(file => ({ name: path.basename(file.originalname || "episode.mp4"), status: "queued" })),
-    inputFiles: files.map(file => file.path), output: null, work, size: 0, error: null
-  };
-  seriesJobs.set(id, job);
-  res.status(202).json({ ok: true, jobId: id, status: job.status, totalEpisodes: files.length });
-
-  setImmediate(async () => {
-    const normalizedFiles = [];
-    try {
-      for (let index = 0; index < files.length; index++) {
-        const file = files[index];
-        const episode = job.episodes[index];
-        job.currentEpisode = index + 1;
-        episode.status = "processing";
-        job.stage = `episode_${index + 1}_analyzing`;
-        const result = await analyzeAndTranslateVideo(file.path, getMimeType(file), file.originalname);
-        if (!result.segments.length) throw new Error(`ភាគ ${index + 1} មិនមានសំឡេងនិយាយដែលអាចបកប្រែបាន`);
-        job.stage = `episode_${index + 1}_creating_khmer_voice`;
-        const built = await createDubbedVideo({ file, body: req.body }, null, result.segments, { returnFile: true });
-        const normalized = path.join(work, `episode-${String(index + 1).padStart(2, "0")}.mp4`);
-        job.stage = `episode_${index + 1}_preparing_video`;
-        await runFfmpeg([
-          "-y", "-i", built.output,
-          "-vf", "scale=432:768:force_original_aspect_ratio=decrease,pad=432:768:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1",
-          "-map", "0:v:0", "-map", "0:a:0",
-          "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-threads", "1",
-          "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-          "-movflags", "+faststart", normalized
-        ]);
-        normalizedFiles.push(normalized);
-        episode.status = "completed";
-        episode.duration = result.duration;
-        await fs.promises.unlink(file.path).catch(() => {});
-        await fs.promises.rm(built.work, { recursive: true, force: true }).catch(() => {});
+      if (job.work) {
+        await fs.promises.rm(job.work, {
+          recursive: true,
+          force: true
+        }).catch(() => {});
       }
 
-      job.stage = "joining_all_episodes";
-      const concatList = path.join(work, "episodes.txt");
-      const listContent = normalizedFiles.map(file => `file '${file.replace(/'/g, "'\\''")}'`).join("\n") + "\n";
-      await fs.promises.writeFile(concatList, listContent, "utf8");
-      job.output = path.join(work, "Khmer-Complete-Series.mp4");
-      await runFfmpeg([
-        "-y", "-f", "concat", "-safe", "0", "-i", concatList,
-        "-c", "copy", "-movflags", "+faststart", job.output
-      ]);
-      const stat = await fs.promises.stat(job.output);
-      if (!stat.size) throw new Error("មិនអាចបង្កើតវីដេអូរឿងភាគចុងក្រោយបាន");
-      job.size = stat.size;
-      job.stage = "completed";
-      job.status = "completed";
-      job.finishedAt = Date.now();
-      if (activeMediaJobId === id) activeMediaJobId = null;
-    } catch (error) {
-      job.status = "failed";
-      job.stage = "failed";
-      job.error = String(error?.message || "បកប្រែរឿងភាគមិនបាន");
-      job.finishedAt = Date.now();
-      if (activeMediaJobId === id) activeMediaJobId = null;
-      await Promise.all(job.inputFiles.map(file => fs.promises.unlink(file).catch(() => {})));
-      await fs.promises.rm(work, { recursive: true, force: true }).catch(() => {});
+    } finally {
+      if (activeMediaJobId === id) {
+        activeMediaJobId = null;
+      }
     }
   });
-}));
-
-app.get("/api/series/jobs/:id", (req, res) => {
-  const job = seriesJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
-  res.json({
-    ok: true, jobId: job.id, status: job.status, stage: job.stage,
-    currentEpisode: job.currentEpisode, totalEpisodes: job.totalEpisodes,
-    episodes: job.episodes, size: job.size || 0, error: job.error
-  });
-});
-
-app.get("/api/series/jobs/:id/download", (req, res) => {
-  const job = seriesJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងាររឿងភាគនេះ ឬវាបានផុតកំណត់" });
-  if (job.status !== "completed" || !job.output) {
-    return res.status(409).json({ ok: false, error: "រឿងភាគមិនទាន់ភ្ជាប់រួចរាល់ទេ" });
-  }
-  res.setHeader("Content-Type", "video/mp4");
-  res.setHeader("Content-Length", String(job.size));
-  res.setHeader("Content-Disposition", 'attachment; filename="Khmer-Complete-Series.mp4"');
-  res.setHeader("Cache-Control", "no-store");
-  res.sendFile(job.output, error => {
-    if (error) {
-      if (!res.headersSent) res.status(500).json({ ok: false, error: "ទាញយកវីដេអូរឿងភាគមិនបាន។" });
-      else res.destroy(error);
-      return;
-    }
-    fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
-    seriesJobs.delete(job.id);
-  });
-});
-
-app.get("/api/video/jobs/:id", (req, res) => {
+}));app.get("/api/video/jobs/:id", (req, res) => {
   const job = videoJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
+
+  if (!job) {
+    return res.status(404).json({
+      ok: false,
+      error: "រកមិនឃើញការងារវីដេអូនេះ"
+    });
+  }
+
   res.json({
     ok: true,
     jobId: job.id,
@@ -859,66 +545,333 @@ app.get("/api/video/jobs/:id", (req, res) => {
 
 app.get("/api/video/jobs/:id/download", (req, res) => {
   const job = videoJobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញការងារវីដេអូនេះ ឬវាបានផុតកំណត់" });
-  if (job.status !== "completed" || !job.output) {
-    return res.status(409).json({ ok: false, error: "វីដេអូមិនទាន់រួចរាល់ទេ" });
-  }
-  res.setHeader("Content-Type", "video/mp4");
-  res.setHeader("Content-Length", String(job.size));
-  res.setHeader("Content-Disposition", 'attachment; filename="khmer-video-dub.mp4"');
-  res.setHeader("Cache-Control", "no-store");
-  res.sendFile(job.output, error => {
-    if (error) {
-      if (!res.headersSent) res.status(500).json({ ok: false, error: "ទាញយក MP4 មិនបាន។" });
-      else res.destroy(error);
-      return;
-    }
-    fs.promises.unlink(job.input).catch(() => {});
-    if (job.work) fs.promises.rm(job.work, { recursive: true, force: true }).catch(() => {});
-    videoJobs.delete(job.id);
-  });
-});
 
-app.post("/api/dub", upload.single("video"), asyncRoute(async (req, res) => {
-  if (!req.file) return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូ" });
-  let segments;
-  try {
-    segments = JSON.parse(req.body?.segments || "[]");
-  } catch (_) {
-    await fs.promises.unlink(req.file.path).catch(() => {});
-    return res.status(400).json({ ok: false, error: "ទិន្នន័យចំណងជើងរងមិនត្រឹមត្រូវ" });
-  }
-  await createDubbedVideo(req, res, segments);
-}));
-
-app.use((err, req, res, next) => {
-  if (res.headersSent) return next(err);
-  if (err instanceof multer.MulterError) {
-    const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
-    return res.status(status).json({
+  if (!job) {
+    return res.status(404).json({
       ok: false,
-      error: `ឯកសារធំពេក ឬមិនអាចទទួលយកបាន។ កម្រិតអតិបរមា ${MAX_VIDEO_MB} MB`
+      error: "រកមិនឃើញការងារវីដេអូនេះ"
     });
   }
-  console.error("[API ERROR]", err);
-  const message = String(err?.message || "");
-  const quotaLimited = isQuotaOrRateLimitError(err);
-  const dailyQuota = quotaLimited && isDailyQuotaError(err);
-  const temporary = isTemporaryGeminiError(err);
-  const status = quotaLimited ? 429 : (temporary ? 503 : (Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500));
-  const khmerMessage = quotaLimited
-    ? (dailyQuota
-      ? "កូតា Gemini ប្រចាំថ្ងៃបានអស់ហើយ។ សូមរង់ចាំឱ្យកូតាកំណត់ឡើងវិញ។"
-      : "Gemini បានកំណត់ចំនួនសំណើ (HTTP 429)។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។")
-    : (temporary
-      ? "សេវា AI កំពុងមមាញឹកជាបណ្ដោះអាសន្ន។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្ដងទៀត។"
-      : (/API key|permission|unauthorized|forbidden/i.test(message)
-        ? "ការភ្ជាប់ Gemini API Key មានបញ្ហា។ សូមពិនិត្យ GEMINI_API_KEY ក្នុង Environment។"
-        : message || "មានបញ្ហាក្នុងម៉ាស៊ីនមេ"));
-  res.status(status).json({ ok: false, error: khmerMessage, retryable: temporary || quotaLimited });
-});
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Khmer AI Translator Pro backend running on port ${PORT}`);
+  if (job.status !== "completed" || !job.output) {
+    return res.status(409).json({
+      ok: false,
+      error: "វីដេអូមិនទាន់រួចរាល់ទេ"
+    });
+  }
+
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="khmer-video-dub.mp4"'
+  );
+  res.setHeader("Cache-Control", "no-store");
+
+  res.sendFile(job.output, error => {
+    if (error) {
+      if (!res.headersSent) {
+        res.status(500).json({
+          ok: false,
+          error: "ទាញយក MP4 មិនបាន"
+        });
+      }
+      return;
+    }
+
+    fs.promises.unlink(job.input).catch(() => {});
+
+    if (job.work) {
+      fs.promises.rm(job.work, {
+        recursive: true,
+        force: true
+      }).catch(() => {});
+    }
+
+    videoJobs.delete(job.id);
+  });
+});app.post("/api/series/jobs", requireGeminiKey, seriesUpload.array("videos", MAX_SERIES_FILES), asyncRoute(async (req, res) => {
+  const files = req.files || [];
+
+  pruneFinishedJobs(seriesJobs);
+
+  if (activeMediaJobId) {
+    await Promise.all(
+      files.map(file => fs.promises.unlink(file.path).catch(() => {}))
+    );
+
+    return res.status(409).json({
+      ok: false,
+      error: "មានការងារវីដេអូកំពុងដំណើរការ សូមរង់ចាំ"
+    });
+  }
+
+  if (files.length < 2) {
+    await Promise.all(
+      files.map(file => fs.promises.unlink(file.path).catch(() => {}))
+    );
+
+    return res.status(400).json({
+      ok: false,
+      error: "សូមជ្រើសរើសយ៉ាងតិច ២ ភាគ"
+    });
+  }
+
+  if (files.length > MAX_SERIES_FILES) {
+    return res.status(400).json({
+      ok: false,
+      error: "អាចជ្រើសរើសបានអតិបរមា ២០ ភាគ"
+    });
+  }
+
+  const totalBytes = files.reduce(
+    (sum, file) => sum + file.size,
+    0
+  );
+
+  if (totalBytes > MAX_SERIES_TOTAL_MB * 1024 * 1024) {
+    await Promise.all(
+      files.map(file => fs.promises.unlink(file.path).catch(() => {}))
+    );
+
+    return res.status(413).json({
+      ok: false,
+      error: "ទំហំវីដេអូសរុបលើសកំណត់"
+    });
+  }
+
+  const id = randomUUID();
+  activeMediaJobId = id;
+
+  const work = path.join(TMP, "series-" + id);
+
+  await fs.promises.mkdir(work, { recursive: true });
+
+  const job = {
+    id,
+    status: "processing",
+    stage: "queued",
+    createdAt: Date.now(),
+    currentEpisode: 0,
+    totalEpisodes: files.length,
+    episodes: files.map(file => ({
+      name: path.basename(file.originalname || "episode.mp4"),
+      status: "queued"
+    })),
+    inputFiles: files.map(file => file.path),
+    output: null,
+    work,
+    size: 0,
+    error: null
+  };
+
+  seriesJobs.set(id, job);
+
+  res.status(202).json({
+    ok: true,
+    jobId: id,
+    status: job.status,
+    totalEpisodes: files.length
+  });
+
+  setImmediate(async () => {
+    const normalizedFiles = [];
+
+    try {
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const episode = job.episodes[index];
+
+        job.currentEpisode = index + 1;
+        episode.status = "processing";
+
+        job.stage = `episode_${index + 1}_analyzing`;
+
+        const result = await analyzeAndTranslateVideo(
+          file.path,
+          getMimeType(file),
+          file.originalname
+        );
+
+        if (!result.segments.length) {
+          throw new Error(
+            `ភាគ ${index + 1} មិនមានសំឡេងនិយាយ`
+          );
+        }
+
+        job.stage = `episode_${index + 1}_creating_voice`;
+
+        const built = await createDubbedVideo(
+          { file, body: req.body },
+          null,
+          result.segments,
+          {
+            returnFile: true,
+            inputPath: file.path
+          }
+        );
+
+        const normalized = path.join(
+          work,
+          `episode-${String(index + 1).padStart(2, "0")}.mp4`
+        );
+
+        await runFfmpeg([
+          "-y",
+          "-i", built.output,
+          "-vf",
+          "scale=432:768:force_original_aspect_ratio=decrease,pad=432:768:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p",
+          "-map", "0:v:0",
+          "-map", "0:a:0",
+          "-c:v", "libx264",
+          "-preset", "ultrafast",
+          "-crf", "26",
+          "-c:a", "aac",
+          "-b:a", "128k",
+          "-movflags", "+faststart",
+          normalized
+        ]);
+
+        normalizedFiles.push(normalized);
+
+        episode.status = "completed";
+
+        await fs.promises.unlink(file.path).catch(() => {});
+
+        await fs.promises.rm(
+          built.work,
+          { recursive: true, force: true }
+        ).catch(() => {});
+  }      job.stage = "joining_all_episodes";
+
+      const concatList = path.join(work, "episodes.txt");
+
+      const listContent = normalizedFiles
+        .map(file => `file '${file.replace(/'/g, "'\\''")}'`)
+        .join("\n") + "\n";
+
+      await fs.promises.writeFile(
+        concatList,
+        listContent,
+        "utf8"
+      );
+
+      job.output = path.join(
+        work,
+        "Khmer-Complete-Series.mp4"
+      );
+
+      await runFfmpeg([
+        "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", concatList,
+        "-c", "copy",
+        "-movflags", "+faststart",
+        job.output
+      ]);
+
+      const stat = await fs.promises.stat(job.output);
+
+      if (!stat.size) {
+        throw new Error("មិនអាចបង្កើតវីដេអូរឿងភាគបានទេ");
+      }
+
+      job.size = stat.size;
+      job.stage = "completed";
+      job.status = "completed";
+      job.finishedAt = Date.now();
+
+    } catch (error) {
+
+      job.status = "failed";
+      job.stage = "failed";
+
+      job.error = String(
+        error?.message || "បកប្រែរឿងភាគមិនបាន"
+      );
+
+      job.finishedAt = Date.now();
+
+      await Promise.all(
+        job.inputFiles.map(file =>
+          fs.promises.unlink(file).catch(() => {})
+        )
+      );
+
+      await fs.promises.rm(
+        work,
+        { recursive: true, force: true }
+      ).catch(() => {});
+
+    } finally {
+
+      if (activeMediaJobId === id) {
+        activeMediaJobId = null;
+      }
+
+    }
+  });
+}));app.get("/api/series/jobs/:id", (req, res) => {
+  const job = seriesJobs.get(req.params.id);
+
+  if (!job) {
+    return res.status(404).json({
+      ok: false,
+      error: "រកមិនឃើញការងាររឿងភាគនេះ"
+    });
+  }
+
+  res.json({
+    ok: true,
+    jobId: job.id,
+    status: job.status,
+    stage: job.stage,
+    currentEpisode: job.currentEpisode,
+    totalEpisodes: job.totalEpisodes,
+    episodes: job.episodes,
+    size: job.size || 0,
+    error: job.error
+  });
+});app.get("/api/series/jobs/:id/download", (req, res) => {
+  const job = seriesJobs.get(req.params.id);
+
+  if (!job) {
+    return res.status(404).json({
+      ok: false,
+      error: "រកមិនឃើញការងាររឿងភាគនេះ"
+    });
+  }
+
+  if (job.status !== "completed" || !job.output) {
+    return res.status(409).json({
+      ok: false,
+      error: "រឿងភាគមិនទាន់រួចរាល់ទេ"
+    });
+  }
+
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="Khmer-Complete-Series.mp4"'
+  );
+  res.setHeader("Cache-Control", "no-store");
+
+  res.sendFile(job.output, error => {
+    if (error) {
+      if (!res.headersSent) {
+        res.status(500).json({
+          ok: false,
+          error: "ទាញយកវីដេអូរឿងភាគមិនបាន"
+        });
+      }
+      return;
+    }
+
+    fs.promises.rm(
+      job.work,
+      { recursive: true, force: true }
+    ).catch(() => {});
+
+    seriesJobs.delete(job.id);
+  });
 });
-    
