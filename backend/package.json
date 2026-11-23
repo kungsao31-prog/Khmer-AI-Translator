@@ -1,8 +1,9 @@
+
 {
   "name": "khmer-ai-translator-backend",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Gemini-powered Khmer translation, video transcription and Khmer speech backend",
+  "description": "Khmer AI Translator Pro - Video Translation and Dubbing",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -16,6 +17,6 @@
     "multer": "^2.0.2",
     "dotenv": "^16.4.7",
     "ffmpeg-static": "^5.2.0",
-    "node-edge-tts": "^1.2.7"
+    "node-edge-tts": "^1.2.12"
   }
 }
