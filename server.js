@@ -33,9 +33,10 @@ let activeMediaJobId = null;
 
 fs.mkdirSync(TMP, { recursive: true });
 app.disable("x-powered-by");
-app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map(x => x.trim()) : true }));
+app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map(x => x.trim()) : false, credentials: false }));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+require("./security")(app);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, TMP),
@@ -787,32 +788,7 @@ app.get("/api/video/jobs/:id/subtitle", (req, res) => {
   );
 
   res.send("\uFEFF" + srt);
-});async function getMediaDuration(filePath) {
-  try {
-    const { stderr } = await execFileAsync(
-      ffmpegPath,
-      ["-i", filePath],
-      {
-        timeout: 60000,
-        maxBuffer: 2 * 1024 * 1024
-      }
-    ).catch(error => ({
-      stderr: error.stderr || ""
-    }));
-
-    const match = String(stderr).match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
-
-    if (!match) return null;
-
-    return (
-      Number(match[1]) * 3600 +
-      Number(match[2]) * 60 +
-      Number(match[3])
-    );
-  } catch (_) {
-    return null;
-  }
-      }`${mixInputs.join("")}amix=inputs=${segments.length}:duration=longest:dropout_transition=0,aresample=44100[mixed]`async function processSeriesJob(series) {
+});async function processSeriesJob(series) {
   series.status = "processing";
   series.updatedAt = Date.now();
 
