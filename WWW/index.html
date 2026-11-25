@@ -441,5 +441,54 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
   checkBackend().catch(e=>{$("connectionDot").classList.remove("ok");$("connectionLabel").textContent="មិនទាន់ភ្ជាប់";setStatus("backendStatus","មិនទាន់ភ្ជាប់៖ "+e.message+"។ សូមចុច «រក្សាទុក និងពិនិត្យការភ្ជាប់»។","error")});
 })();
 </script>
+
+<script>
+/* Secure frontend session: token stays in sessionStorage, never in source code. */
+(function(){
+  const KEY="khmer_ai_token";
+  let token=sessionStorage.getItem(KEY)||"";
+  const originalFetch=window.fetch.bind(window);
+  window.fetch=function(input,init){
+    let url=typeof input==="string"?input:(input&&input.url)||"";
+    init=init||{};
+    const headers=new Headers(init.headers||(input instanceof Request?input.headers:undefined));
+    if(token && url.includes("/api/") && !url.includes("/api/auth/login")) headers.set("Authorization","Bearer "+token);
+    if(url.includes("/api/video/jobs") && init.method==="POST") url=url.replace("/api/video/jobs","/api/video/translate-and-dub");
+    return originalFetch(url,{...init,headers});
+  };
+  const OriginalXHR=window.XMLHttpRequest;
+  function SecureXHR(){
+    const xhr=new OriginalXHR();let requestUrl="";
+    const open=xhr.open;
+    xhr.open=function(method,url,...rest){requestUrl=String(url);if(requestUrl.includes("/api/video/jobs")&&String(method).toUpperCase()==="POST")requestUrl=requestUrl.replace("/api/video/jobs","/api/video/translate-and-dub");return open.call(xhr,method,requestUrl,...rest)};
+    const send=xhr.send;
+    xhr.send=function(body){if(token&&requestUrl.includes("/api/")&&!requestUrl.includes("/api/auth/login"))xhr.setRequestHeader("Authorization","Bearer "+token);return send.call(xhr,body)};
+    return xhr;
+  }
+  window.XMLHttpRequest=SecureXHR;
+  function logout(){token="";sessionStorage.removeItem(KEY);location.reload()}
+  function showLogin(){
+    if(document.getElementById("khmerAuthGate"))return;
+    const gate=document.createElement("div");gate.id="khmerAuthGate";
+    gate.style.cssText="position:fixed;inset:0;z-index:99999;background:#061615f5;display:grid;place-items:center;padding:18px;font-family:system-ui,'Noto Sans Khmer',sans-serif";
+    gate.innerHTML='<form id="khmerAuthForm" style="width:min(420px,100%);background:#102725;border:1px solid #19e6b0;border-radius:20px;padding:22px;color:#effffb"><h2 style="margin-top:0">Khmer AI Translator Pro</h2><p style="color:#9bbcb5;font-size:13px">សូម Login ដើម្បីប្រើប្រាស់កម្មវិធី</p><label>ឈ្មោះអ្នកប្រើ</label><input id="khmerAuthUser" autocomplete="username" required style="display:block;width:100%;padding:12px;margin:6px 0 14px;background:#071b1a;color:white;border:1px solid #315c54;border-radius:10px"><label>ពាក្យសម្ងាត់</label><input id="khmerAuthPass" type="password" autocomplete="current-password" required style="display:block;width:100%;padding:12px;margin:6px 0 14px;background:#071b1a;color:white;border:1px solid #315c54;border-radius:10px"><button style="width:100%;padding:13px;background:#0bbd94;color:white;border:0;border-radius:11px;font-weight:bold">ចូលប្រើ</button><p id="khmerAuthError" style="color:#ffaaaa;font-size:13px"></p></form>';
+    document.body.appendChild(gate);
+    gate.querySelector("form").addEventListener("submit",async e=>{
+      e.preventDefault();const btn=gate.querySelector("button");btn.disabled=true;
+      try{
+        const response=await originalFetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("khmerAuthUser").value,password:document.getElementById("khmerAuthPass").value})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error||"Login មិនបាន");
+        token=data.token;sessionStorage.setItem(KEY,token);gate.remove();location.reload();
+      }catch(err){document.getElementById("khmerAuthError").textContent=err.message;btn.disabled=false}
+    });
+  }
+  if(!token)showLogin();
+  else {
+    originalFetch("/api/health").then(r=>r.json()).then(h=>{if(!h.ok)throw new Error("health");}).catch(()=>{});
+    const logoutBtn=document.createElement("button");logoutBtn.textContent="ចាកចេញ";logoutBtn.className="btn alt";logoutBtn.style.cssText="position:fixed;right:18px;bottom:18px;z-index:1000;width:auto;padding:9px 14px";logoutBtn.addEventListener("click",logout);document.body.appendChild(logoutBtn);
+  }
+})();
+</script>
+
 </body>
 </html>
