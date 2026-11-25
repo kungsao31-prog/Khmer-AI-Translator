@@ -37,6 +37,7 @@ app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split("
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 require("./security")(app);
+app.use(express.static(path.join(__dirname, "WWW"), { index: "index.html", maxAge: "1h" }));
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, TMP),
