@@ -5,7 +5,7 @@
   "description": "Khmer AI Translator Pro web frontend and Android build",
   "scripts": {
     "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('WWW/index.html')) { console.error('ERROR: WWW/index.html not found. Keep the WWW folder in the project root.'); process.exit(1); } fs.rmSync('dist',{recursive:true,force:true}); fs.cpSync('WWW','dist',{recursive:true}); console.log('SUCCESS: WWW copied to dist');\"",
-    "start": "node backend/server.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=20"
