@@ -18,6 +18,8 @@ const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+// OpenAI fallback is opt-in; Gemini remains the default provider.
+const ENABLE_OPENAI_FALLBACK = String(process.env.ENABLE_OPENAI_FALLBACK || "false").toLowerCase() === "true";
 const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/files";
@@ -64,7 +66,7 @@ const seriesUpload = multer({ storage, fileFilter, limits: { fileSize: MAX_VIDEO
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function asyncRoute(handler) { return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next); }
 function requireAnyAI(_req, res, next) {
-  if (!API_KEY && !OPENAI_API_KEY) return res.status(503).json({ ok: false, error: "សូមកំណត់ GEMINI_API_KEY ឬ OPENAI_API_KEY នៅលើ Render Environment" });
+  if (!API_KEY && !(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY)) return res.status(503).json({ ok: false, error: "សូមកំណត់ GEMINI_API_KEY នៅលើ Render Environment" });
   next();
 }
 function getMimeType(file) {
@@ -266,9 +268,11 @@ async function analyzeVideoWithFallback(filePath, originalName) {
       const result = await analyzeVideoWithGemini(filePath, originalName);
       return { ...result, provider: "Gemini" };
     } catch (error) {
-      console.warn("Gemini video analysis failed; trying OpenAI fallback:", error.message);
-      if (!OPENAI_API_KEY) throw error;
+      if (!(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY)) throw error;
+      console.warn("Gemini video analysis failed; trying enabled OpenAI fallback:", error.message);
     }
+  } else if (!(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY)) {
+    throw new Error("មិនទាន់កំណត់ GEMINI_API_KEY នៅលើ Render ទេ");
   }
   return analyzeVideoWithOpenAI(filePath);
 }
@@ -420,9 +424,11 @@ async function translateTextToKhmer(text) {
     { temperature: 0.2 }
       );
     } catch (error) {
-      console.warn("Gemini text translation failed; trying OpenAI fallback:", error.message);
-      if (!OPENAI_API_KEY) throw error;
+      if (!(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY)) throw error;
+      console.warn("Gemini text translation failed; trying enabled OpenAI fallback:", error.message);
     }
+  } else if (!(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY)) {
+    throw new Error("មិនទាន់កំណត់ GEMINI_API_KEY នៅលើ Render ទេ");
   }
   const result = await openAIJsonRequest("https://api.openai.com/v1/chat/completions", JSON.stringify({
     model: OPENAI_TEXT_MODEL,
@@ -763,7 +769,8 @@ app.get("/api/health", (_req, res) => {
     status: "online",
     geminiConfigured: Boolean(API_KEY),
     openaiConfigured: Boolean(OPENAI_API_KEY),
-    fallbackConfigured: Boolean(OPENAI_API_KEY),
+    fallbackConfigured: Boolean(ENABLE_OPENAI_FALLBACK && OPENAI_API_KEY),
+    openaiFallbackEnabled: ENABLE_OPENAI_FALLBACK,
     ffmpegAvailable: Boolean(ffmpegPath),
     maxVideoMB: MAX_VIDEO_MB,
     timestamp: new Date().toISOString()
