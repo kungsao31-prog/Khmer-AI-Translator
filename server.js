@@ -89,16 +89,33 @@ function parseJsonObject(value) {
   }
 }
 async function geminiGenerate(model, contents, options = {}) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": API_KEY },
-    body: JSON.stringify({ contents, generationConfig: options })
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error?.message || `Gemini API error (${response.status})`);
-  const text = (data?.candidates?.[0]?.content?.parts || []).map(part => part.text || "").join("\n").trim();
-  if (!text) throw new Error("Gemini មិនបានផ្ញើអត្ថបទត្រឡប់មកវិញទេ");
-  return text;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const body = JSON.stringify({ contents, generationConfig: options });
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": API_KEY },
+        body
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const text = (data?.candidates?.[0]?.content?.parts || []).map(part => part.text || "").join("\n").trim();
+        if (!text) throw new Error("Gemini មិនបានផ្ញើអត្ថបទត្រឡប់មកវិញទេ");
+        return text;
+      }
+      const message = data?.error?.message || `Gemini API error (${response.status})`;
+      lastError = new Error(message);
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 3) throw lastError;
+      console.warn(`Gemini temporary error ${response.status}; retry ${attempt + 1}/3`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3 || !/fetch failed|network|timeout|temporarily unavailable/i.test(String(error.message || error))) throw error;
+    }
+    await sleep(1500 * (2 ** attempt));
+  }
+  throw lastError || new Error("Gemini API មិនអាចដំណើរការបានទេ");
 }
 async function uploadGeminiFile(filePath, mimeType, displayName) {
   const stat = await fs.promises.stat(filePath);
