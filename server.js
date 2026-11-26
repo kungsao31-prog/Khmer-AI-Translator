@@ -131,7 +131,7 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
   let file = uploaded.file || uploaded;
   for (let attempt = 0; attempt < 60 && file.state === "PROCESSING"; attempt++) {
     await sleep(2000);
-    const check = await fetch(`${GEMINI_BASE}/${file.name}`, { headers: { "x-goog-api-key": API_KEY } });
+    const check = await fetch(`https://generativelanguage.googleapis.com/v1beta/${file.name}`, { headers: { "x-goog-api-key": API_KEY } });
     const checked = await check.json().catch(() => ({}));
     if (!check.ok) throw new Error(checked?.error?.message || "ពិនិត្យស្ថានភាពឯកសារនៅ Gemini មិនបាន");
     file = checked;
@@ -142,7 +142,7 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
 }
 async function deleteGeminiFile(name) {
   if (!name) return;
-  try { await fetch(`${GEMINI_BASE}/${name}`, { method: "DELETE", headers: { "x-goog-api-key": API_KEY } }); } catch (_) {}
+  try { await fetch(`https://generativelanguage.googleapis.com/v1beta/${name}`, { method: "DELETE", headers: { "x-goog-api-key": API_KEY } }); } catch (_) {}
                              }function runWithConcurrency(items, limit, worker) {
   let next = 0;
   const results = new Array(items.length);
