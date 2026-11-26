@@ -908,3 +908,133 @@ app.post(
       totalVideos: jobs.length,
       jobs
     });
+
+    processSeriesJob(series).catch(error => {
+      series.status = "failed";
+      series.error = error.message;
+      series.finishedAt = Date.now();
+    });
+  })
+);
+
+app.get("/api/series/jobs/:id", (req, res) => {
+  const series = seriesJobs.get(req.params.id);
+
+  if (!series) {
+    return res.status(404).json({
+      ok: false,
+      error: "រកមិនឃើញជួរការងារនេះទេ"
+    });
+  }
+
+  res.json({
+    ok: true,
+    series: {
+      id: series.id,
+      status: series.status,
+      progress: series.progress,
+      completed: series.completed,
+      failed: series.failed,
+      currentIndex: series.currentIndex,
+      totalVideos: series.jobs.length,
+      message: series.message,
+      error: series.error,
+      jobs: series.jobs.map(id =>
+        getPublicJob(videoJobs.get(id))
+      )
+    }
+  });
+});
+
+app.get("/api/series/jobs/:id/download", (req, res) => {
+  const series = seriesJobs.get(req.params.id);
+
+  if (!series) {
+    return res.status(404).json({
+      ok: false,
+      error: "រកមិនឃើញជួរការងារនេះទេ"
+    });
+  }
+
+  const completedJobs = series.jobs
+    .map(id => videoJobs.get(id))
+    .filter(job => job && job.status === "completed" && job.output);
+
+  if (!completedJobs.length) {
+    return res.status(409).json({
+      ok: false,
+      error: "មិនទាន់មានវីដេអូរួចរាល់សម្រាប់ទាញយកទេ"
+    });
+  }
+
+  res.json({
+    ok: true,
+    videos: completedJobs.map(job => ({
+      id: job.id,
+      name: `Khmer-Dubbed-${job.id}.mp4`,
+      downloadUrl: `/api/video/jobs/${job.id}/download`
+    }))
+  });
+});app.get("/", (_req, res) => {
+  res.json({
+    name: "Khmer AI Translator Pro",
+    status: "online",
+    version: "1.0.0",
+    endpoints: {
+      health: "/api/health",
+      translate: "/api/translate",
+      tts: "/api/tts",
+      video: "/api/video/translate-and-dub",
+      jobs: "/api/video/jobs"
+    }
+  });
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: "រកមិនឃើញ API នេះទេ",
+    path: req.originalUrl
+  });
+});
+
+app.use((error, req, res, next) => {
+  console.error("Server error:", error);
+
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  const status =
+    error instanceof multer.MulterError
+      ? error.code === "LIMIT_FILE_SIZE" || error.code === "LIMIT_FILE_COUNT"
+        ? 413
+        : 400
+      : 500;
+
+  res.status(status).json({
+    ok: false,
+    error: error.message || "មានបញ្ហានៅលើ Server"
+  });
+});
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log("================================");
+  console.log("Khmer AI Translator Pro");
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Gemini configured: ${Boolean(API_KEY)}`);
+  console.log("================================");
+});
+
+server.requestTimeout = 0;
+server.headersTimeout = 120000;
+server.keepAliveTimeout = 65000;
+
+process.on("SIGTERM", () => {
+  console.log("Server shutting down...");
+  server.close(() => process.exit(0));
+});
+
+process.on("SIGINT", () => {
+  server.close(() => process.exit(0));
+});
