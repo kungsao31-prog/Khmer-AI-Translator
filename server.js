@@ -9,9 +9,8 @@ const { spawn } = require("child_process");
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
-const GEMINI_VIDEO_MODEL = (process.env.GEMINI_VIDEO_MODEL || "gemini-3.5-flash-lite").trim();
-const GEMINI_TEXT_MODEL = (process.env.GEMINI_TEXT_MODEL || "gemini-3.5-flash-lite").trim();
-const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
+const GEMINI_VIDEO_MODEL = (process.env.GEMINI_VIDEO_MODEL || "gemini-2.5-flash").trim();
+const GEMINI_TEXT_MODEL = (process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash").trim();
 
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const UPLOAD_DIR = path.join(TMP, "uploads");
@@ -69,15 +68,23 @@ function getMimeType(filePath, originalName = "") {
 }
 
 function getUniqueModels(primary) {
-  const list = [primary, GEMINI_VIDEO_MODEL, "gemini-3.5-flash-lite", "gemini-2.5-flash"].filter(Boolean);
+  const list = [
+    "gemini-2.5-flash",
+    primary,
+    GEMINI_VIDEO_MODEL,
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash"
+  ].filter(Boolean);
   return [...new Set(list)];
 }
 
-async function geminiFetchWithRetry(url, options, maxAttempts = 3) {
+async function geminiFetchWithRetry(url, options, maxAttempts = 2, timeoutMs = 45000) {
   let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, { ...options, signal: controller.signal });
       if (res.ok) return res;
       let errMsg = `HTTP ${res.status}`;
       try {
@@ -89,16 +96,23 @@ async function geminiFetchWithRetry(url, options, maxAttempts = 3) {
         throw lastError;
       }
     } catch (err) {
-      lastError = err;
+      lastError = err.name === "AbortError"
+        ? new Error("ការតភ្ជាប់ទៅ Gemini AI លើសពេលកំណត់ (Timeout)")
+        : err;
       if (attempt === maxAttempts - 1) break;
+    } finally {
+      clearTimeout(timer);
     }
-    await sleep(1500 * (2 ** attempt));
+    await sleep(1500 * (attempt + 1));
   }
   throw lastError || new Error("Gemini API មិនឆ្លើយតប");
 }
 
-async function uploadGeminiFile(filePath, mimeType, displayName) {
+async function uploadGeminiFile(filePath, mimeType, displayName, onProgress) {
   const stat = await fs.promises.stat(filePath);
+  console.log(`[GeminiUpload] Starting upload (${Math.round(stat.size / 1024)} KB)`);
+  if (onProgress) onProgress(20, "កំពុងបញ្ជូនវីដេអូទៅកាន់ AI...");
+
   const start = await geminiFetchWithRetry(
     "https://generativelanguage.googleapis.com/upload/v1beta/files",
     {
@@ -112,40 +126,61 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ file: { display_name: displayName || path.basename(filePath) } })
-    }
+    },
+    2,
+    30000
   );
 
   const uploadUrl = start.headers.get("x-goog-upload-url");
   if (!uploadUrl) throw new Error("មិនអាចទទួលបានតំណផ្ទុកឯកសារទៅ Gemini ទេ");
 
   const fileBuffer = await fs.promises.readFile(filePath);
-  const finish = await geminiFetchWithRetry(uploadUrl, {
-    method: "POST",
-    headers: {
-      "Content-Length": String(stat.size),
-      "X-Goog-Upload-Offset": "0",
-      "X-Goog-Upload-Command": "upload, finalize"
+  const finish = await geminiFetchWithRetry(
+    uploadUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Length": String(stat.size),
+        "X-Goog-Upload-Offset": "0",
+        "X-Goog-Upload-Command": "upload, finalize"
+      },
+      body: fileBuffer
     },
-    body: fileBuffer
-  });
+    2,
+    60000
+  );
 
   const uploaded = await finish.json();
   let fileInfo = uploaded.file || uploaded;
   if (!fileInfo || !fileInfo.name) throw new Error("ការផ្ទុកវីដេអូទៅ Gemini បរាជ័យ");
 
-  for (let i = 0; i < 45; i++) {
-    if (fileInfo.state === "ACTIVE") return fileInfo;
-    if (fileInfo.state === "FAILED") throw new Error("Gemini មិនអាចដំណើរការឯកសារវីដេអូនេះបានទេ");
+  if (onProgress) onProgress(26, "AI កំពុងរៀបចំឯកសារវីដេអូ...");
+  for (let i = 0; i < 30; i++) {
+    if (fileInfo.state === "ACTIVE") {
+      console.log(`[GeminiUpload] File ACTIVE: ${fileInfo.name}`);
+      return fileInfo;
+    }
+    if (fileInfo.state === "FAILED") {
+      throw new Error("Gemini មិនអាចដំណើរការឯកសារវីដេអូនេះបានទេ");
+    }
     await sleep(2000);
-    const check = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileInfo.name}`, {
-      headers: { "x-goog-api-key": API_KEY }
-    });
-    if (check.ok) {
-      const data = await check.json();
-      fileInfo = data.file || data;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const check = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileInfo.name}`, {
+        headers: { "x-goog-api-key": API_KEY },
+        signal: controller.signal
+      });
+      if (check.ok) {
+        const data = await check.json();
+        fileInfo = data.file || data;
+      }
+    } catch (_) {
+    } finally {
+      clearTimeout(timer);
     }
   }
-  return fileInfo;
+  throw new Error("AI រៀបចំឯកសារវីដេអូលើសពេលកំណត់ សូមសាកល្បងម្តងទៀត");
 }
 
 async function deleteGeminiFile(fileName) {
@@ -165,13 +200,13 @@ function parseJsonResponse(rawText) {
   return JSON.parse(cleaned);
 }
 
-async function analyzeVideoWithFallback(videoPath, originalName) {
+async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
   if (!API_KEY) {
     throw new Error("មិនទាន់បានកំណត់ GEMINI_API_KEY នៅលើ Server ទេ");
   }
 
   const mimeType = getMimeType(videoPath, originalName);
-  const uploadedFile = await uploadGeminiFile(videoPath, mimeType, originalName);
+  const uploadedFile = await uploadGeminiFile(videoPath, mimeType, originalName, onProgress);
 
   const prompt = [
     "You are an expert video translator and Khmer dubbing scriptwriter.",
@@ -192,6 +227,9 @@ async function analyzeVideoWithFallback(videoPath, originalName) {
   try {
     for (const model of models) {
       try {
+        console.log(`[GeminiAnalyze] Trying model: ${model}`);
+        if (onProgress) onProgress(32, `AI (${model}) កំពុងស្តាប់ បកប្រែ និងបែងចែកតួអង្គ...`);
+
         const res = await geminiFetchWithRetry(
           `[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){encodeURIComponent(model)}:generateContent`,
           {
@@ -215,7 +253,8 @@ async function analyzeVideoWithFallback(videoPath, originalName) {
               }
             })
           },
-          3
+          2,
+          60000
         );
 
         const data = await res.json();
@@ -227,9 +266,8 @@ async function analyzeVideoWithFallback(videoPath, originalName) {
           .map((seg, idx) => {
             const start = Math.max(0, Number(seg.start) || 0);
             const end = Math.max(start + 0.6, Number(seg.end) || start + 2.0);
-            const speaker = String(seg.speaker || "").toLowerCase().includes("male") && !String(seg.speaker || "").toLowerCase().includes("female")
-              ? "male"
-              : "female";
+            const sp = String(seg.speaker || "").toLowerCase();
+            const speaker = sp.includes("male") && !sp.includes("female") ? "male" : "female";
             const cleanText = String(seg.text || "").trim();
             return { index: idx, start, end, speaker, text: cleanText };
           })
@@ -239,13 +277,15 @@ async function analyzeVideoWithFallback(videoPath, originalName) {
           throw new Error("AI មិនអាចស្គាល់សំឡេងនិយាយនៅក្នុងវីដេអូនេះបានទេ");
         }
 
+        console.log(`[GeminiAnalyze] Success with ${model}: ${segments.length} segments`);
         return {
           provider: model,
           sourceLanguage: parsed.sourceLanguage || "auto",
           videoTitle: String(parsed.videoTitle || "").trim(),
           segments
         };
-      } catch (err) {
+      require (err) {
+        console.error(`[GeminiAnalyze] Failed with ${model}: ${err.message}`);
         lastError = err;
       }
     }
@@ -410,13 +450,14 @@ function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
 }
 
 async function createDubbedVideo(options) {
-  const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration } = options;
+  const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration, onProgress } = options;
   if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
   await fs.promises.mkdir(workDir, { recursive: true });
   const audioFiles = [];
   const assPath = path.join(workDir, "subtitles.ass");
 
   try {
+    if (onProgress) onProgress(50, "កំពុងបង្កើតសំឡេងខ្មែរតួប្រុស និងតួស្រី...");
     await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
       const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
       const segmentVoice = voice === "male"
@@ -428,6 +469,7 @@ async function createDubbedVideo(options) {
       audioFiles[index] = audioPath;
     });
 
+    if (onProgress) onProgress(70, "កំពុងបាំងអក្សរចាស់ ដាក់អក្សរខ្មែរ និងបញ្ចូលសំឡេង...");
     await createAssSubtitle(segments, videoTitle, assPath);
     const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
     const hasTitle = Boolean(String(videoTitle || "").trim());
@@ -481,7 +523,7 @@ async function createDubbedVideo(options) {
   } finally {
     await fs.promises.unlink(assPath).catch(() => {});
     for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
-  }
+    }
 }
 
 function createJob(map, inputPath, originalName, voice) {
@@ -519,10 +561,14 @@ async function processVideoJob(job) {
   if (activeMediaJobId) throw new Error("មានការងារវីដេអូមួយកំពុងដំណើរការរួចហើយ");
   activeMediaJobId = job.id;
   try {
-    updateJob(job, "processing", 5, "កំពុងរៀបចំវីដេអូ");
+    console.log(`[VideoJob] Started ${job.id} (${job.originalName})`);
+    updateJob(job, "processing", 10, "កំពុងរៀបចំវីដេអូ");
     await fs.promises.mkdir(job.work, { recursive: true });
-    updateJob(job, "processing", 15, "កំពុងវិភាគ បកប្រែចំណងជើង និងបែងចែកតួអង្គ");
-    const analysis = await analyzeVideoWithFallback(job.input, job.originalName);
+
+    const analysis = await analyzeVideoWithFallback(job.input, job.originalName, (pct, msg) => {
+      updateJob(job, "processing", pct, msg);
+    });
+
     job.provider = analysis.provider;
     job.segments = analysis.segments;
     job.videoTitle = analysis.videoTitle || "";
@@ -535,14 +581,17 @@ async function processVideoJob(job) {
       outputPath: outPath,
       segments: job.segments,
       videoTitle: job.videoTitle,
-            voice: job.voice,
-      workDir: job.work
+      voice: job.voice,
+      workDir: job.work,
+      onProgress: (pct, msg) => updateJob(job, "processing", pct, msg)
     });
 
     job.output = outPath;
     job.finishedAt = Date.now();
     updateJob(job, "completed", 100, "បកប្រែវីដេអូរួចរាល់ 100%");
+    console.log(`[VideoJob] Completed ${job.id}`);
   } catch (err) {
+    console.error(`[VideoJob] Failed ${job.id}: ${err.message}`);
     job.error = err.message || "មានបញ្ហាក្នុងការបកប្រែវីដេអូ";
     job.finishedAt = Date.now();
     updateJob(job, "failed", job.progress, job.error);
@@ -714,7 +763,9 @@ app.post(["/api/translate-text", "/api/translate"], async (req, res) => {
             }
           ]
         })
-      }
+      },
+      2,
+      30000
     );
     const data = await r.json();
     const translatedText = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() || "";
@@ -741,6 +792,52 @@ app.post(["/api/tts", "/api/speak"], async (req, res) => {
   }
 });
 
+app.post(["/api/login", "/api/auth/login", "/login"], (req, res) => {
+  const username = String(req.body?.username || req.body?.user || "").trim();
+  const password = String(req.body?.password || req.body?.pass || "").trim();
+  const expectedUser = (process.env.ADMIN_USERNAME || process.env.APP_USERNAME || "khmeradmin").trim();
+  const expectedPass = (process.env.ADMIN_PASSWORD || process.env.APP_PASSWORD || "").trim();
+
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, success: false, error: "សូមបញ្ចូលឈ្មោះអ្នកប្រើ និងពាក្យសម្ងាត់" });
+  }
+
+  const isValid = expectedPass
+    ? (username === expectedUser && password === expectedPass)
+    : (username === expectedUser && password.length > 0);
+
+  if (!isValid) {
+    return res.status(401).json({ ok: false, success: false, error: "ឈ្មោះអ្នកប្រើ ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ" });
+  }
+
+  const token = Buffer.from(`${username}:${Date.now()}`).toString("base64");
+  res.json({
+    ok: true,
+    success: true,
+    token,
+    username,
+    user: { username, role: "admin" }
+  });
+});
+
+app.get(["/api/me", "/api/auth/me", "/api/session", "/api/check-auth"], (req, res) => {
+  const username = (process.env.ADMIN_USERNAME || process.env.APP_USERNAME || "khmeradmin").trim();
+  res.json({
+    ok: true,
+    authenticated: true,
+    username,
+    user: { username, role: "admin" }
+  });
+});
+
+app.post(["/api/logout", "/api/auth/logout"], (req, res) => {
+  res.json({ ok: true, success: true });
+});
+
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ ok: false, error: `រកមិនឃើញមុខងារ API នេះទេ (${req.path})` });
+});
+
 app.get("*", (req, res) => {
   const indexPublic = path.join(publicDir, "index.html");
   if (fs.existsSync(indexPublic)) return res.sendFile(indexPublic);
@@ -756,4 +853,4 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Gemini configured: ${Boolean(API_KEY)}`);
   console.log("================================");
 });
-
+  
