@@ -429,14 +429,14 @@ async function createAssSubtitle(segments, videoTitle, assPath) {
   await fs.promises.writeFile(assPath, "\uFEFF" + lines.join("\n"), "utf8");
   return assPath;
 }
-
-async function createDubbedVideo(options) {
+  async function createDubbedVideo(options) {
   const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration } = options;
   if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
   await fs.promises.mkdir(workDir, { recursive: true });
   const audioFiles = [];
   const assPath = path.join(workDir, "subtitles.ass");
-  try await await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
+  try {
+    await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
       const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
       const segmentVoice = voice === "male" ? "male" : voice === "female_only" ? "female" : (segment.speaker === "male" ? "male" : "female");
       await createKhmerSpeech(segment.text, audioPath, segmentVoice);
@@ -446,10 +446,9 @@ async function createDubbedVideo(options) {
     const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
     const hasTitle = Boolean(String(videoTitle || "").trim());
     const args = ["-y", "-i", inputPath];
-    const args = ["-y", "-i", inputPath];
+    for (const audioPath of audioFiles) args.push("-i", audioPath);
 
-
-      const filters = [];
+    const filters = [];
     if (hasTitle) {
       filters.push("[0:v]split=3[base][topraw][botraw]");
       filters.push("[topraw]crop=w=iw:h='trunc(ih*0.13/2)*2':x=0:y='trunc(ih*0.05/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
@@ -461,7 +460,7 @@ async function createDubbedVideo(options) {
       filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
       filters.push("[base][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
     }
-    
+
     filters.push(`[vmasked]ass='${escapedAss}'[vout]`);
 
     const mixInputs = [];
@@ -483,7 +482,8 @@ async function createDubbedVideo(options) {
     await fs.promises.unlink(assPath).catch(() => {});
     for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
   }
-      }
+}
+   }
 function createJob(map, inputPath, originalName, voice) {
   const id = randomUUID();
   const job = {
