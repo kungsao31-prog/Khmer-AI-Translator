@@ -368,8 +368,9 @@ body{background:radial-gradient(ellipse at 50% 0%,#29213f 0,#10121f 48%,#080b13 
         const poll=async()=>{
           try{
             const response=await fetch(apiUrl("/api/video/jobs/"+encodeURIComponent(jobId)),{cache:"no-store"});
-            const job=await response.json().catch(()=>({}));
-            if(!response.ok)throw new Error(job.error||"មិនអាចពិនិត្យស្ថានភាពការងារបាន");
+            const payload=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(payload.error||"មិនអាចពិនិត្យស្ថានភាពការងារបាន");
+            const job=payload.job||payload;
             failures=0;
             if(job.status==="failed"){reject(new Error(job.error||"ការបកប្រែវីដេអូមិនបាន"));return}
             if(job.status==="completed"){
