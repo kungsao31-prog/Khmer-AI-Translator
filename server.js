@@ -436,8 +436,7 @@ async function createDubbedVideo(options) {
   await fs.promises.mkdir(workDir, { recursive: true });
   const audioFiles = [];
   const assPath = path.join(workDir, "subtitles.ass");
-  try {
-    await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
+  try await await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
       const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
       const segmentVoice = voice === "male" ? "male" : voice === "female_only" ? "female" : (segment.speaker === "male" ? "male" : "female");
       await createKhmerSpeech(segment.text, audioPath, segmentVoice);
@@ -449,18 +448,19 @@ async function createDubbedVideo(options) {
     const args = ["-y", "-i", inputPath];
     for (const audioPath of audioFiles) args.push("-i", audioPath);
 
-    const filters = [];
+      const filters = [];
     if (hasTitle) {
       filters.push("[0:v]split=3[base][topraw][botraw]");
-      filters.push("[topraw]crop=iw:trunc(ih*0.13/2)*2:0:trunc(ih*0.05/2)*2,boxblur=8:2,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
-      filters.push("[botraw]crop=iw:trunc(ih*0.14/2)*2:0:trunc(ih*0.78/2)*2,boxblur=8:2,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][topblur]overlay=0:trunc(ih*0.05/2)*2[v1]");
-      filters.push("[v1][botblur]overlay=0:trunc(ih*0.78/2)*2[vmasked]");
+      filters.push("[topraw]crop=w=iw:h='trunc(ih*0.13/2)*2':x=0:y='trunc(ih*0.05/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
+      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
+      filters.push("[base][topblur]overlay=x=0:y='trunc(H*0.05/2)*2'[v1]");
+      filters.push("[v1][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
     } else {
       filters.push("[0:v]split=2[base][botraw]");
-      filters.push("[botraw]crop=iw:trunc(ih*0.14/2)*2:0:trunc(ih*0.78/2)*2,boxblur=8:2,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][botblur]overlay=0:trunc(ih*0.78/2)*2[vmasked]");
+      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
+      filters.push("[base][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
     }
+    
     filters.push(`[vmasked]ass='${escapedAss}'[vout]`);
 
     const mixInputs = [];
