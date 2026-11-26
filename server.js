@@ -190,7 +190,7 @@ async function openAITranslateSegments(segments) {
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "You are a professional audiovisual translator. Translate every input segment into natural, accurate Khmer. Preserve meaning, names, tone, and segment order. Return only JSON: {\\"translations\\":[{\\"index\\":0,\\"text\\":\\"Khmer translation\\"}]}. Do not omit any index." },
+        { role: "system", content: "You are a professional audiovisual translator. Translate every input segment into natural, accurate Khmer. Preserve meaning, names, tone, and segment order. Return only JSON: {\"translations\":[{\"index\":0,\"text\":\"Khmer translation\"}]}. Do not omit any index." },
         { role: "user", content: JSON.stringify({ segments: batch.map((item, i) => ({ index: offset + i, text: item.text })) }) }
       ]
     });
