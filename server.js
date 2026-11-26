@@ -284,7 +284,8 @@ async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
           videoTitle: String(parsed.videoTitle || "").trim(),
           segments
         };
-      require (err) {
+          } catch (err) {
+        
         console.error(`[GeminiAnalyze] Failed with ${model}: ${err.message}`);
         lastError = err;
       }
