@@ -845,7 +845,7 @@ app.post(
 
 app.post(
   "/api/video/translate-and-dub",
-  requireGeminiKey,
+  requireAnyAI,
   upload.single("video"),
   asyncRoute(async (req, res) => {
     if (!req.file) {
