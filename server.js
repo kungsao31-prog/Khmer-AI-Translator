@@ -446,7 +446,8 @@ async function createDubbedVideo(options) {
     const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
     const hasTitle = Boolean(String(videoTitle || "").trim());
     const args = ["-y", "-i", inputPath];
-    for (const audioPath of audioFiles) args.push("-i", audioPath);
+    const args = ["-y", "-i", inputPath];
+
 
       const filters = [];
     if (hasTitle) {
