@@ -17,6 +17,9 @@ const execFileAsync = promisify(execFile);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.GEMINI_API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini";
+const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/files";
 const GEMINI_UPLOAD_BASE = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 const normalizeModel = value => String(value || "").trim().replace(/^models\//, "");
@@ -60,8 +63,8 @@ const seriesUpload = multer({ storage, fileFilter, limits: { fileSize: MAX_VIDEO
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function asyncRoute(handler) { return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next); }
-function requireGeminiKey(_req, res, next) {
-  if (!API_KEY) return res.status(503).json({ ok: false, error: "មិនទាន់កំណត់ GEMINI_API_KEY នៅលើ Server ទេ" });
+function requireAnyAI(_req, res, next) {
+  if (!API_KEY && !OPENAI_API_KEY) return res.status(503).json({ ok: false, error: "សូមកំណត់ GEMINI_API_KEY ឬ OPENAI_API_KEY នៅលើ Render Environment" });
   next();
 }
 function getMimeType(file) {
@@ -160,7 +163,117 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
 async function deleteGeminiFile(name) {
   if (!name) return;
   try { await fetch(`https://generativelanguage.googleapis.com/v1beta/${name}`, { method: "DELETE", headers: { "x-goog-api-key": API_KEY } }); } catch (_) {}
-                             }function runWithConcurrency(items, limit, worker) {
+                             }
+
+async function openAIJsonRequest(url, body, options = {}) {
+  if (!OPENAI_API_KEY) throw new Error("មិនទាន់កំណត់ OPENAI_API_KEY នៅលើ Render ទេ");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, ...(options.headers || {}) },
+    body,
+    signal: AbortSignal.timeout(options.timeout || 180000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data?.error?.message || `OpenAI API error (${response.status})`;
+    throw new Error(message);
+  }
+  return data;
+}
+
+async function openAITranslateSegments(segments) {
+  const translated = [];
+  for (let offset = 0; offset < segments.length; offset += 40) {
+    const batch = segments.slice(offset, offset + 40);
+    const body = JSON.stringify({
+      model: OPENAI_TEXT_MODEL,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: "You are a professional audiovisual translator. Translate every input segment into natural, accurate Khmer. Preserve meaning, names, tone, and segment order. Return only JSON: {\\"translations\\":[{\\"index\\":0,\\"text\\":\\"Khmer translation\\"}]}. Do not omit any index." },
+        { role: "user", content: JSON.stringify({ segments: batch.map((item, i) => ({ index: offset + i, text: item.text })) }) }
+      ]
+    });
+    const result = await openAIJsonRequest("https://api.openai.com/v1/chat/completions", body, {
+      headers: { "Content-Type": "application/json" },
+      timeout: 180000
+    });
+    const content = result?.choices?.[0]?.message?.content || "";
+    const parsed = parseJsonObject(content);
+    const rows = Array.isArray(parsed.translations) ? parsed.translations : [];
+    for (let i = 0; i < batch.length; i++) {
+      const row = rows.find(item => Number(item.index) === offset + i) || rows[i];
+      const text = String(row?.text || "").trim();
+      if (!text) throw new Error(`OpenAI មិនបានបកប្រែប្រយោគទី ${offset + i + 1}`);
+      translated.push({ ...batch[i], text });
+    }
+  }
+  return translated;
+}
+
+async function analyzeVideoWithOpenAI(filePath) {
+  if (!OPENAI_API_KEY) throw new Error("មិនទាន់កំណត់ OPENAI_API_KEY នៅលើ Render ទេ");
+  const workDir = path.join(TMP, `openai-audio-${randomUUID()}`);
+  await fs.promises.mkdir(workDir, { recursive: true });
+  try {
+    const pattern = path.join(workDir, "audio-%03d.mp3");
+    await runFfmpeg([
+      "-y", "-i", filePath, "-vn", "-ac", "1", "-ar", "16000",
+      "-c:a", "libmp3lame", "-b:a", "48k",
+      "-f", "segment", "-segment_time", "480", "-reset_timestamps", "1",
+      pattern
+    ], 60 * 60 * 1000);
+    const chunks = (await fs.promises.readdir(workDir))
+      .filter(name => /^audio-\d+\.mp3$/.test(name))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    if (!chunks.length) throw new Error("មិនអាចដកសំឡេងពីវីដេអូបានទេ");
+
+    const sourceSegments = [];
+    let sourceLanguage = "unknown";
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkPath = path.join(workDir, chunks[i]);
+      const stat = await fs.promises.stat(chunkPath);
+      if (stat.size > 24 * 1024 * 1024) throw new Error("ផ្នែកសំឡេងធំពេកសម្រាប់ OpenAI។ សូមបំបែកវីដេអូជាផ្នែកខ្លីជាងនេះ");
+      const audio = await fs.promises.readFile(chunkPath);
+      const form = new FormData();
+      form.append("file", new Blob([audio], { type: "audio/mpeg" }), chunks[i]);
+      form.append("model", OPENAI_TRANSCRIBE_MODEL);
+      form.append("response_format", "verbose_json");
+      form.append("timestamp_granularities[]", "segment");
+      const transcript = await openAIJsonRequest("https://api.openai.com/v1/audio/transcriptions", form, { timeout: 300000 });
+      if (i === 0 && transcript.language) sourceLanguage = transcript.language;
+      const chunkOffset = i * 480;
+      for (const segment of (transcript.segments || [])) {
+        const text = String(segment.text || "").trim();
+        const start = Number(segment.start);
+        const end = Number(segment.end);
+        if (text && Number.isFinite(start) && Number.isFinite(end) && end > start) {
+          sourceSegments.push({ start: start + chunkOffset, end: end + chunkOffset, text });
+        }
+      }
+    }
+    if (!sourceSegments.length) throw new Error("OpenAI មិនអាចរកឃើញប្រយោគនិយាយក្នុងវីដេអូនេះទេ");
+    const khmerSegments = await openAITranslateSegments(sourceSegments);
+    return { sourceLanguage, segments: normalizeSegments(khmerSegments), provider: "OpenAI" };
+  } finally {
+    await fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function analyzeVideoWithFallback(filePath, originalName) {
+  if (API_KEY) {
+    try {
+      const result = await analyzeVideoWithGemini(filePath, originalName);
+      return { ...result, provider: "Gemini" };
+    } catch (error) {
+      console.warn("Gemini video analysis failed; trying OpenAI fallback:", error.message);
+      if (!OPENAI_API_KEY) throw error;
+    }
+  }
+  return analyzeVideoWithOpenAI(filePath);
+}
+
+function runWithConcurrency(items, limit, worker) {
   let next = 0;
   const results = new Array(items.length);
 
@@ -294,7 +407,9 @@ async function translateTextToKhmer(text) {
     throw new Error(`អត្ថបទវែងពេក។ អនុញ្ញាតអតិបរមា ${MAX_TEXT_CHARS} តួអក្សរ`);
   }
 
-  return await geminiGenerate(
+  if (API_KEY) {
+    try {
+      return await geminiGenerate(
     TEXT_MODEL,
     [{
       role: "user",
@@ -303,7 +418,23 @@ async function translateTextToKhmer(text) {
       }]
     }],
     { temperature: 0.2 }
-  );
+      );
+    } catch (error) {
+      console.warn("Gemini text translation failed; trying OpenAI fallback:", error.message);
+      if (!OPENAI_API_KEY) throw error;
+    }
+  }
+  const result = await openAIJsonRequest("https://api.openai.com/v1/chat/completions", JSON.stringify({
+    model: OPENAI_TEXT_MODEL,
+    temperature: 0.2,
+    messages: [
+      { role: "system", content: "Translate the user's text into natural Khmer. Preserve meaning and return only the translated text without explanation." },
+      { role: "user", content: input }
+    ]
+  }), { headers: { "Content-Type": "application/json" }, timeout: 180000 });
+  const translated = result?.choices?.[0]?.message?.content?.trim();
+  if (!translated) throw new Error("OpenAI មិនបានផ្ញើអត្ថបទបកប្រែត្រឡប់មកវិញទេ");
+  return translated;
 }
 
 async function createKhmerSpeech(text, outputPath, voice = "female") {
@@ -526,10 +657,11 @@ async function processVideoJob(job) {
 
     updateJob(job, "processing", 15, "កំពុងវិភាគ និងបកប្រែសំឡេង");
 
-    const analysis = await analyzeVideoWithGemini(
+    const analysis = await analyzeVideoWithFallback(
       job.input,
       job.originalName
     );
+    job.provider = analysis.provider;
 
     job.segments = analysis.segments;
     job.sourceLanguage = analysis.sourceLanguage;
@@ -582,6 +714,7 @@ function getPublicJob(job) {
     message: job.message,
     originalName: job.originalName,
     sourceLanguage: job.sourceLanguage,
+    provider: job.provider || null,
     segments: job.segments,
     error: job.error,
     createdAt: job.createdAt,
@@ -629,13 +762,15 @@ app.get("/api/health", (_req, res) => {
     service: "Khmer AI Translator Pro",
     status: "online",
     geminiConfigured: Boolean(API_KEY),
+    openaiConfigured: Boolean(OPENAI_API_KEY),
+    fallbackConfigured: Boolean(OPENAI_API_KEY),
     ffmpegAvailable: Boolean(ffmpegPath),
     maxVideoMB: MAX_VIDEO_MB,
     timestamp: new Date().toISOString()
   });
 });
 
-app.post("/api/translate", requireGeminiKey, asyncRoute(async (req, res) => {
+app.post("/api/translate", requireAnyAI, asyncRoute(async (req, res) => {
   const text = req.body?.text || req.body?.content || "";
   const translated = await translateTextToKhmer(text);
 
@@ -676,7 +811,7 @@ app.post("/api/tts", asyncRoute(async (req, res) => {
 
 app.post(
   "/api/video/translate",
-  requireGeminiKey,
+  requireAnyAI,
   upload.single("video"),
   asyncRoute(async (req, res) => {
     if (!req.file) {
@@ -687,7 +822,7 @@ app.post(
     }
 
     try {
-      const result = await analyzeVideoWithGemini(
+      const result = await analyzeVideoWithFallback(
         req.file.path,
         req.file.originalname
       );
@@ -697,6 +832,7 @@ app.post(
       res.json({
         ok: true,
         sourceLanguage: result.sourceLanguage,
+        provider: result.provider,
         segments: result.segments,
         subtitle: srt,
         srt
@@ -858,7 +994,7 @@ app.get("/api/video/jobs/:id/subtitle", (req, res) => {
 
 app.post(
   "/api/series/jobs",
-  requireGeminiKey,
+  requireAnyAI,
   seriesUpload.array("videos", MAX_SERIES_FILES),
   asyncRoute(async (req, res) => {
     const files = req.files || [];
