@@ -304,10 +304,12 @@ async function createKhmerSpeech(text, outputPath, voice = "female") {
   const tts = new EdgeTTS({
     voice: selectedVoice,
     lang: "km-KH",
-    outputFormat: "audio-24khz-48kbitrate-mono-mp3"
+    outputFormat: "audio-24khz-48kbitrate-mono-mp3",
+    timeout: 60000
   });
 
-  await tts.tts(cleanText, outputPath);
+  // node-edge-tts 1.2.x writes audio files with ttsPromise().
+  await tts.ttsPromise(cleanText, outputPath);
 
   const stat = await fs.promises.stat(outputPath);
 
