@@ -18,6 +18,7 @@ const GEMINI_TEXT_MODEL = (!RAW_TEXT_MODEL || RAW_TEXT_MODEL.includes("2.0") || 
   ? "gemini-3.8-flash"
   : RAW_TEXT_MODEL;
 
+const AUTO_CHUNK_SECONDS = 600; // កាត់វីដេអូជាវគ្គ ១០ នាទី (៦០០ វិនាទី) ដោយស្វ័យប្រវត្តិ
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const UPLOAD_DIR = path.join(TMP, "uploads");
 const JOBS_FILE = path.join(TMP, "jobs-state.json");
@@ -71,7 +72,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 1024 * 1024 * 1024 }
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }
 });
 
 function sleep(ms) {
@@ -186,7 +187,7 @@ async function createKhmerSpeech(text, outPath, voiceGender = "female") {
 
   await synthesizeWithGoogleFallback(cleanText, outPath);
   }
-      function getUniqueModels(primary) {
+    function getUniqueModels(primary) {
   const list = [primary, "gemini-3.8-flash", "gemini-3.5-flash-lite"].filter(Boolean);
   return [...new Set(list.filter((m) => !m.includes("2.0") && !m.includes("2.5")))];
 }
@@ -221,7 +222,7 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
   const uploadUrl = startRes.headers.get("x-goog-upload-url");
   if (!uploadUrl) throw new Error("មិនទទួលបានតំណបង្ហោះវីដេអូពី Gemini");
 
-  const fileBuffer = await fs.promises.readFile(filePath);
+  const fileStream = fs.createReadStream(filePath);
   const uploadRes = await fetch(uploadUrl, {
     method: "POST",
     headers: {
@@ -229,7 +230,8 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
       "X-Goog-Upload-Offset": "0",
       "X-Goog-Upload-Command": "upload, finalize"
     },
-    body: fileBuffer
+    body: fileStream,
+    duplex: "half"
   });
   if (!uploadRes.ok) {
     const errTxt = await uploadRes.text();
@@ -238,7 +240,7 @@ async function uploadGeminiFile(filePath, mimeType, displayName) {
   const uploadData = await uploadRes.json();
   let fileInfo = uploadData.file || uploadData;
 
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < 50; attempt++) {
     if (fileInfo.state === "ACTIVE") return fileInfo;
     if (fileInfo.state === "FAILED") throw new Error("Gemini មិនអាចអានឯកសារវីដេអូនេះបានទេ");
     await sleep(2000);
@@ -389,19 +391,8 @@ async function translateTextWithFallback(text, style = "natural") {
     }
   }
   throw lastError || new Error("បកប្រែអត្ថបទបរាជ័យ");
-  }
-   function formatAssTime(seconds) {
-  const totalCs = Math.max(0, Math.round(Number(seconds || 0) * 100));
-  const cs = totalCs % 100;
-  const totalSec = Math.floor(totalCs / 100);
-  const s = totalSec % 60;
-  const totalMin = Math.floor(totalSec / 60);
-  const m = totalMin % 60;
-  const h = Math.floor(totalMin / 60);
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
-}
-
-function formatSrtTime(seconds) {
+                }
+            function formatSrtTime(seconds) {
   const totalMs = Math.max(0, Math.round(Number(seconds || 0) * 1000));
   const ms = totalMs % 1000;
   const totalSec = Math.floor(totalMs / 1000);
@@ -412,65 +403,7 @@ function formatSrtTime(seconds) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
-function escapeAssText(text) {
-  return String(text || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\{/g, "\\{")
-    .replace(/\}/g, "\\}")
-    .replace(/\r?\n/g, "\\N");
-}
-
-function wrapKhmerText(text, maxChars = 34) {
-  const clean = String(text || "").trim();
-  if (clean.length <= maxChars) return clean;
-  const mid = Math.floor(clean.length / 2);
-  let splitIdx = clean.lastIndexOf(" ", mid + 6);
-  if (splitIdx < mid - 10) splitIdx = clean.indexOf(" ", mid - 6);
-  if (splitIdx > 0 && splitIdx < clean.length - 3) {
-    return `${clean.slice(0, splitIdx).trim()}\\N${clean.slice(splitIdx + 1).trim()}`;
-  }
-  return `${clean.slice(0, mid)}\\N${clean.slice(mid)}`;
-}
-
-async function createAssSubtitle(segments, videoTitle, assPath) {
-  const maxEnd = segments.reduce((m, s) => Math.max(m, Number(s.end) || 0), 5) + 1.5;
-  const header = [
-    "[Script Info]",
-    "ScriptType: v4.00+",
-    "PlayResX: 480",
-    "PlayResY: 854",
-    "ScaledBorderAndShadow: yes",
-    "",
-    "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Default,Noto Sans Khmer,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1.8,1,2,24,24,88,1",
-    "Style: Subtitle,Noto Sans Khmer,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1.8,1,2,24,24,88,1",
-    "Style: Title,Noto Sans Khmer,26,&H0000E5FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,1,8,24,24,60,1",
-    "",
-    "[Events]",
-    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
-  ];
-
-  const events = [];
-  const cleanTitle = String(videoTitle || "").trim();
-  if (cleanTitle) {
-    events.push(`Dialogue: 1,0:00:00.00,${formatAssTime(maxEnd)},Title,,0,0,0,,${escapeAssText(wrapKhmerText(cleanTitle, 28))}`);
-  }
-
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const nextStart = i + 1 < segments.length ? segments[i + 1].start : seg.end + 0.5;
-    const start = Math.max(0, Number(seg.start) || 0);
-    const end = Math.max(start + 0.5, Math.min(Number(seg.end) || start + 2, Math.max(start + 0.5, nextStart - 0.05)));
-    const line = escapeAssText(wrapKhmerText(seg.text, 34));
-    events.push(`Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Subtitle,,0,0,0,,${line}`);
-  }
-
-  const content = "\uFEFF" + [...header, ...events].join("\n") + "\n";
-  await fs.promises.writeFile(assPath, content, "utf8");
-}
-
-function runFfmpeg(args, timeoutMs = 20 * 60 * 1000) {
+function runFfmpeg(args, timeoutMs = 15 * 60 * 1000) {
   return new Promise((resolve, reject) => {
     const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -498,12 +431,51 @@ function runFfmpeg(args, timeoutMs = 20 * 60 * 1000) {
   });
 }
 
+function getMediaDurationSeconds(filePath) {
+  return new Promise((resolve) => {
+    const proc = spawn("ffmpeg", ["-i", filePath], { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    proc.stderr.on("data", (c) => {
+      stderr += c.toString();
+      if (stderr.length > 8000) stderr = stderr.slice(-6000);
+    });
+    proc.on("close", () => {
+      const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+      if (!m) return resolve(0);
+      const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+      resolve(Number.isFinite(sec) ? sec : 0);
+    });
+    proc.on("error", () => resolve(0));
+  });
+}
+
+async function splitVideoIntoChunks(inputPath, outDir, chunkSeconds = AUTO_CHUNK_SECONDS) {
+  await fs.promises.mkdir(outDir, { recursive: true });
+  const pattern = path.join(outDir, "chunk-%03d.mp4");
+  const args = [
+    "-y",
+    "-i", inputPath,
+    "-map", "0:v:0",
+    "-map", "0:a?",
+    "-c", "copy",
+    "-f", "segment",
+    "-segment_time", String(chunkSeconds),
+    "-reset_timestamps", "1",
+    pattern
+  ];
+  await runFfmpeg(args, 10 * 60 * 1000);
+  const names = (await fs.promises.readdir(outDir))
+    .filter((n) => n.startsWith("chunk-") && n.endsWith(".mp4"))
+    .sort();
+  if (!names.length) return [inputPath];
+  return names.map((n) => path.join(outDir, n));
+}
+
 async function createDubbedVideo(options) {
-  const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration, onProgress } = options;
+  const { inputPath, outputPath, segments, voice = "auto", workDir, duration, onProgress } = options;
   if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
   await fs.promises.mkdir(workDir, { recursive: true });
   const audioFiles = [];
-  const assPath = path.join(workDir, "subtitles.ass");
   const mixedAudioPath = path.join(workDir, "mixed-voice.m4a");
 
   try {
@@ -519,8 +491,8 @@ async function createDubbedVideo(options) {
       audioFiles[index] = audioPath;
     });
 
-    if (onProgress) onProgress(65, "កំពុងរៀបចំបញ្ចូលសំឡេងខ្មែរ...");
-    const audioArgs = ["-y"];
+    if (onProgress) onProgress(70, "កំពុងរៀបចំបញ្ចូលសំឡេងខ្មែរ...");
+    const audioArgs = ["-y", "-threads", "1"];
     for (const audioPath of audioFiles) audioArgs.push("-i", audioPath);
 
     const audioFilters = [];
@@ -538,58 +510,61 @@ async function createDubbedVideo(options) {
     }
 
     audioArgs.push(
+      "-filter_threads", "1",
+      "-filter_complex_threads", "1",
       "-filter_complex", audioFilters.join(";"),
       "-map", "[mixed]",
       "-c:a", "aac",
-      "-b:a", "128k"
+      "-b:a", "128k",
+      "-threads", "1"
     );
     if (Number.isFinite(duration) && duration > 0) audioArgs.push("-t", String(duration));
     audioArgs.push(mixedAudioPath);
 
-    await runFfmpeg(audioArgs, 10 * 60 * 1000);
+    await runFfmpeg(audioArgs, 8 * 60 * 1000);
 
-    if (onProgress) onProgress(78, "កំពុងដាក់អក្សរខ្មែរ និងផលិតវីដេអូ...");
-    await createAssSubtitle(segments, videoTitle, assPath);
-    const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
-    const hasTitle = Boolean(String(videoTitle || "").trim());
-
-    const vfChain = [
-      "scale=w='if(gt(iw,ih),min(854,iw),min(480,iw))':h='if(gt(iw,ih),min(480,ih),min(854,ih))':force_original_aspect_ratio=decrease",
-      "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-      "drawbox=x=0:y='trunc(ih*0.77/2)*2':w=iw:h='trunc(ih*0.15/2)*2':color=black@0.65:t=fill"
-    ];
-    if (hasTitle) {
-      vfChain.push("drawbox=x=0:y='trunc(ih*0.05/2)*2':w=iw:h='trunc(ih*0.13/2)*2':color=black@0.60:t=fill");
-    }
-    vfChain.push(`ass='${escapedAss}'`);
-
-    const videoArgs = [
+    if (onProgress) onProgress(85, "កំពុងភ្ជាប់សំឡេងខ្មែរចូលវីដេអូ...");
+    const copyMuxArgs = [
       "-y",
       "-i", inputPath,
       "-i", mixedAudioPath,
-      "-vf", vfChain.join(","),
       "-map", "0:v:0",
       "-map", "1:a:0",
-      "-r", "24",
-      "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-tune", "zerolatency",
-      "-crf", "26",
-      "-pix_fmt", "yuv420p",
-      "-threads", "1",
+      "-c:v", "copy",
       "-c:a", "copy",
       "-shortest",
       "-movflags", "+faststart"
     ];
-    if (Number.isFinite(duration) && duration > 0) videoArgs.push("-t", String(duration));
-    videoArgs.push(outputPath);
+    if (Number.isFinite(duration) && duration > 0) copyMuxArgs.push("-t", String(duration));
+    copyMuxArgs.push(outputPath);
 
-    await runFfmpeg(videoArgs, 20 * 60 * 1000);
+    try {
+      await runFfmpeg(copyMuxArgs, 5 * 60 * 1000);
+    } catch (_) {
+      const fallbackArgs = [
+        "-y",
+        "-threads", "1",
+        "-i", inputPath,
+        "-i", mixedAudioPath,
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "26",
+        "-pix_fmt", "yuv420p",
+        "-threads", "1",
+        "-c:a", "copy",
+        "-shortest",
+        "-movflags", "+faststart",
+        outputPath
+      ];
+      await runFfmpeg(fallbackArgs, 15 * 60 * 1000);
+    }
+
     const outStat = await fs.promises.stat(outputPath);
     if (!outStat.size) throw new Error("វីដេអូ MP4 ដែលបានបង្កើតមានទំហំសូន្យ");
     return { outputPath, size: outStat.size, duration: duration || null, segments: segments.length };
   } finally {
-    await fs.promises.unlink(assPath).catch(() => {});
     await fs.promises.unlink(mixedAudioPath).catch(() => {});
     for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
   }
@@ -628,37 +603,97 @@ function updateJob(job, status, progress, message) {
   saveJobsToDisk();
 }
 
+async function processChunkPipeline(job, chunkPaths) {
+  const dubbedOutputs = [];
+  const allSegments = [];
+  let timeOffset = 0;
+
+  try {
+    for (let i = 0; i < chunkPaths.length; i++) {
+      const chunkPath = chunkPaths[i];
+      const total = chunkPaths.length;
+      const chunkStartPct = Math.round((i / total) * 88) + 6;
+      const chunkSpanPct = Math.max(8, Math.floor(88 / total));
+      const label = total > 1 ? `វគ្គទី ${i + 1}/${total}` : "វីដេអូ";
+
+      updateJob(job, "processing", chunkStartPct, `កំពុងស្កេន និងបកប្រែ${label}...`);
+      const chunkDuration = await getMediaDurationSeconds(chunkPath);
+
+      const analysis = await analyzeVideoWithFallback(chunkPath, `part-${i + 1}.mp4`, (subPct) => {
+        const mapped = chunkStartPct + Math.round((subPct / 100) * (chunkSpanPct * 0.55));
+        updateJob(job, "processing", Math.min(92, mapped), `AI កំពុងបកប្រែ${label}...`);
+      });
+
+      if (!job.provider) job.provider = analysis.provider;
+      if (!job.videoTitle && analysis.videoTitle) job.videoTitle = analysis.videoTitle;
+      if (!job.sourceLanguage && analysis.sourceLanguage) job.sourceLanguage = analysis.sourceLanguage;
+
+      for (const seg of analysis.segments) {
+        allSegments.push({
+          start: Number((seg.start + timeOffset).toFixed(2)),
+          end: Number((seg.end + timeOffset).toFixed(2)),
+          speaker: seg.speaker,
+          text: seg.text
+        });
+      }
+
+      const partOut = path.join(job.work, `dubbed-${String(i).padStart(3, "0")}.mp4`);
+      const partWork = path.join(job.work, `w-${i}`);
+
+      await createDubbedVideo({
+        inputPath: chunkPath,
+        outputPath: partOut,
+        segments: analysis.segments,
+        voice: job.voice,
+        workDir: partWork,
+        onProgress: (subPct) => {
+          const mapped = chunkStartPct + Math.round((chunkSpanPct * 0.55) + ((subPct / 100) * (chunkSpanPct * 0.4)));
+          updateJob(job, "processing", Math.min(93, mapped), `កំពុងបញ្ចូលសំឡេងខ្មែរ${label}...`);
+        }
+      });
+
+      dubbedOutputs.push(partOut);
+      timeOffset += chunkDuration > 0 ? chunkDuration : (analysis.segments[analysis.segments.length - 1]?.end || 0);
+      await fs.promises.unlink(chunkPath).catch(() => {});
+    }
+
+    job.segments = allSegments;
+
+    if (dubbedOutputs.length === 1) {
+      return dubbedOutputs[0];
+    }
+
+    updateJob(job, "processing", 95, `កំពុងភ្ជាប់ទាំង ${dubbedOutputs.length} វគ្គជាវីដេអូ MP4 តែមួយ...`);
+    const listPath = path.join(job.work, "concat.txt");
+    const listBody = dubbedOutputs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n");
+    await fs.promises.writeFile(listPath, listBody, "utf8");
+    const finalOut = path.join(job.work, `khmer-full-${job.id}.mp4`);
+    await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", finalOut]);
+
+    for (const p of dubbedOutputs) await fs.promises.unlink(p).catch(() => {});
+    return finalOut;
+  } catch (err) {
+    for (const p of dubbedOutputs) await fs.promises.unlink(p).catch(() => {});
+    throw err;
+  }
+}
+
 async function processVideoJob(job) {
   if (activeMediaJobId) throw new Error("មានការងារវីដេអូមួយកំពុងដំណើរការរួចហើយ");
   activeMediaJobId = job.id;
+  let chunkPaths = [];
   try {
     console.log(`[VideoJob] Started ${job.id} (${job.originalName})`);
-    updateJob(job, "processing", 10, "កំពុងរៀបចំវីដេអូ");
+    updateJob(job, "processing", 4, "កំពុងពិនិត្យ និងកាត់វីដេអូជាវគ្គ ១០ នាទីដោយស្វ័យប្រវត្តិ...");
     await fs.promises.mkdir(job.work, { recursive: true });
 
-    const analysis = await analyzeVideoWithFallback(job.input, job.originalName, (pct, msg) => {
-      updateJob(job, "processing", pct, msg);
-    });
+    chunkPaths = await splitVideoIntoChunks(job.input, path.join(job.work, "split-0"), AUTO_CHUNK_SECONDS);
+    if (chunkPaths[0] !== job.input) {
+      await fs.promises.unlink(job.input).catch(() => {});
+    }
 
-    job.provider = analysis.provider;
-    job.segments = analysis.segments;
-    job.videoTitle = analysis.videoTitle || "";
-    job.sourceLanguage = analysis.sourceLanguage;
-
-    updateJob(job, "processing", 45, "កំពុងបង្កើតសំឡេងខ្មែរ និងដាក់អក្សរខ្មែរលើវីដេអូ");
-    const outPath = path.join(job.work, `khmer-${job.id}.mp4`);
-
-    await createDubbedVideo({
-      inputPath: job.input,
-      outputPath: outPath,
-      segments: job.segments,
-      videoTitle: job.videoTitle,
-      voice: job.voice,
-      workDir: job.work,
-      onProgress: (pct, msg) => updateJob(job, "processing", pct, msg)
-    });
-
-    job.output = outPath;
+    const finalOut = await processChunkPipeline(job, chunkPaths);
+    job.output = finalOut;
     job.finishedAt = Date.now();
     updateJob(job, "completed", 100, "បកប្រែវីដេអូរួចរាល់ 100%");
     console.log(`[VideoJob] Completed ${job.id}`);
@@ -670,52 +705,39 @@ async function processVideoJob(job) {
   } finally {
     if (activeMediaJobId === job.id) activeMediaJobId = null;
     await fs.promises.unlink(job.input).catch(() => {});
+    for (const c of chunkPaths) await fs.promises.unlink(c).catch(() => {});
   }
 }
 
 async function processSeriesJob(job, files) {
   if (activeMediaJobId) throw new Error("មានការងារវីដេអូមួយកំពុងដំណើរការរួចហើយ");
   activeMediaJobId = job.id;
-  const episodeOutputs = [];
+  const allChunks = [];
   try {
     await fs.promises.mkdir(job.work, { recursive: true });
+    updateJob(job, "processing", 4, "កំពុងកាត់វីដេអូជាវគ្គ ១០ នាទីដោយស្វ័យប្រវត្តិ...");
+
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      const basePct = Math.round((i / files.length) * 85);
-      updateJob(job, "processing", Math.max(5, basePct), `កំពុងបកប្រែភាគទី ${i + 1}/${files.length}`);
-      const analysis = await analyzeVideoWithFallback(f.path, f.originalname);
-      const epOut = path.join(job.work, `ep-${String(i).padStart(3, "0")}.mp4`);
-      const epWork = path.join(job.work, `w-${i}`);
-      await createDubbedVideo({
-        inputPath: f.path,
-        outputPath: epOut,
-        segments: analysis.segments,
-        videoTitle: analysis.videoTitle || "",
-        voice: job.voice,
-        workDir: epWork
-      });
-      episodeOutputs.push(epOut);
-      await fs.promises.unlink(f.path).catch(() => {});
+      const parts = await splitVideoIntoChunks(f.path, path.join(job.work, `split-${i}`), AUTO_CHUNK_SECONDS);
+      allChunks.push(...parts);
+      if (parts[0] !== f.path) {
+        await fs.promises.unlink(f.path).catch(() => {});
+      }
     }
 
-    updateJob(job, "processing", 90, "កំពុងភ្ជាប់គ្រប់ភាគជាវីដេអូ MP4 តែមួយ");
-    const listPath = path.join(job.work, "concat.txt");
-    const listBody = episodeOutputs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n");
-    await fs.promises.writeFile(listPath, listBody, "utf8");
-    const finalOut = path.join(job.work, `khmer-series-${job.id}.mp4`);
-    await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", finalOut]);
-
+    const finalOut = await processChunkPipeline(job, allChunks);
     job.output = finalOut;
     job.finishedAt = Date.now();
-    updateJob(job, "completed", 100, "ភ្ជាប់រឿងគ្រប់ភាគរួចរាល់ 100%");
+    updateJob(job, "completed", 100, `បកប្រែ និងភ្ជាប់ទាំង ${allChunks.length} វគ្គរួចរាល់ 100%`);
   } catch (err) {
-    job.error = err.message || "មានបញ្ហាក្នុងការភ្ជាប់រឿង";
+    job.error = err.message || "មានបញ្ហាក្នុងការបកប្រែ និងភ្ជាប់រឿង";
     job.finishedAt = Date.now();
     updateJob(job, "failed", job.progress, job.error);
   } finally {
     if (activeMediaJobId === job.id) activeMediaJobId = null;
     for (const f of files) await fs.promises.unlink(f.path).catch(() => {});
-    for (const ep of episodeOutputs) await fs.promises.unlink(ep).catch(() => {});
+    for (const c of allChunks) await fs.promises.unlink(c).catch(() => {});
   }
 }
 
@@ -763,16 +785,16 @@ app.post(["/api/translate-video", "/api/video/translate", "/api/jobs/video", "/a
 app.post(["/api/translate-series", "/api/batch-video", "/api/merge-episodes", "/api/jobs/series", "/api/video/series", "/api/video/batch"], upload.any(), (req, res) => {
   try {
     const files = Array.isArray(req.files) ? req.files : [];
-    if (files.length < 2) {
-      for (const f of files) fs.promises.unlink(f.path).catch(() => {});
-      return res.status(400).json({ ok: false, success: false, error: "សូមជ្រើសរើសវីដេអូចាប់ពី ២ ភាគឡើងទៅ" });
+    if (!files.length) {
+      return res.status(400).json({ ok: false, success: false, error: "សូមជ្រើសរើសឯកសារវីដេអូយ៉ាងតិច ១ ឯកសារ" });
     }
     if (activeMediaJobId) {
       for (const f of files) fs.promises.unlink(f.path).catch(() => {});
       return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងដំណើរការការងារមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
     }
     const voice = String(req.body?.voice || req.body?.gender || "auto").trim();
-    const job = createJob(jobs, files[0].path, `${files.length} ភាគ`, voice);
+    const label = files.length === 1 ? files[0].originalname : `${files.length} ភាគ`;
+    const job = createJob(jobs, files[0].path, label, voice);
     processSeriesJob(job, files).catch(() => {});
     res.status(202).json({
       ok: true,
@@ -889,7 +911,7 @@ app.post(["/api/tts", "/api/speak"], async (req, res) => {
   }
 });
 
- app.get("*", (req, res) => {
+app.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ ok: false, error: "រកមិនឃើញតំណភ្ជាប់ API នេះទេ" });
   }
@@ -919,4 +941,3 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Gemini configured: ${Boolean(API_KEY)}`);
   console.log("================================");
 });
-                                            
