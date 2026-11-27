@@ -9,8 +9,10 @@ const { spawn } = require("child_process");
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
-const GEMINI_VIDEO_MODEL = (process.env.GEMINI_VIDEO_MODEL || "gemini-2.5-flash").trim();
-const GEMINI_TEXT_MODEL = (process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash").trim();
+const RAW_VIDEO_MODEL = (process.env.GEMINI_VIDEO_MODEL || "").trim();
+const RAW_TEXT_MODEL = (process.env.GEMINI_TEXT_MODEL || "").trim();
+const GEMINI_VIDEO_MODEL = (!RAW_VIDEO_MODEL || RAW_VIDEO_MODEL.includes("2.0")) ? "gemini-3.8-flash" : RAW_VIDEO_MODEL;
+const GEMINI_TEXT_MODEL = (!RAW_TEXT_MODEL || RAW_TEXT_MODEL.includes("2.0")) ? "gemini-3.8-flash" : RAW_TEXT_MODEL;
 
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const UPLOAD_DIR = path.join(TMP, "uploads");
