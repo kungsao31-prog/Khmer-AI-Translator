@@ -459,7 +459,7 @@ async function splitVideoIntoChunks(inputPath, outDir, chunkSeconds = AUTO_CHUNK
     "-map", "0:a?",
     "-c", "copy",
     "-f", "segment",
-    "-segment_time", String(chunkSeconds),
+        "-segment_time", String(chunkSeconds),
     "-reset_timestamps", "1",
     pattern
   ];
@@ -471,14 +471,55 @@ async function splitVideoIntoChunks(inputPath, outDir, chunkSeconds = AUTO_CHUNK
   return names.map((n) => path.join(outDir, n));
 }
 
+async function mixAudioBatch(batchItems, batchOutPath) {
+  const args = ["-y", "-threads", "1"];
+  for (const item of batchItems) args.push("-i", item.path);
+
+  const filters = [];
+  if (batchItems.length === 1) {
+    const delay = Math.max(0, Math.round(batchItems[0].start * 1000));
+    filters.push(`[0:a]adelay=${delay}:all=1,aresample=44100[bOut]`);
+  } else {
+    const labels = [];
+    for (let i = 0; i < batchItems.length; i++) {
+      const delay = Math.max(0, Math.round(batchItems[i].start * 1000));
+      filters.push(`[${i}:a]adelay=${delay}:all=1,aresample=44100[v${i}]`);
+      labels.push(`[v${i}]`);
+    }
+    filters.push(`${labels.join("")}amix=inputs=${batchItems.length}:duration=longest:dropout_transition=0:normalize=0,aresample=44100[bOut]`);
+  }
+
+  args.push(
+    "-filter_threads", "1",
+    "-filter_complex_threads", "1",
+    "-filter_complex", filters.join(";"),
+    "-map", "[bOut]",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-threads", "1",
+    batchOutPath
+  );
+  await runFfmpeg(args, 3 * 60 * 1000);
+}
+
 async function createDubbedVideo(options) {
   const { inputPath, outputPath, segments, voice = "auto", workDir, duration, onProgress } = options;
   if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
   await fs.promises.mkdir(workDir, { recursive: true });
   const audioFiles = [];
+  const batchFiles = [];
   const mixedAudioPath = path.join(workDir, "mixed-voice.m4a");
 
   try {
+    let targetDuration = Number(duration);
+    if (!Number.isFinite(targetDuration) || targetDuration <= 0) {
+      targetDuration = await getMediaDurationSeconds(inputPath);
+    }
+    const maxSegEnd = segments.reduce((m, s) => Math.max(m, Number(s.end) || 0), 0);
+    if (!Number.isFinite(targetDuration) || targetDuration <= 0) {
+      targetDuration = maxSegEnd + 1;
+    }
+
     if (onProgress) onProgress(50, "កំពុងបង្កើតសំឡេងខ្មែរតួប្រុស និងតួស្រី...");
     await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
       const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
@@ -492,36 +533,41 @@ async function createDubbedVideo(options) {
     });
 
     if (onProgress) onProgress(70, "កំពុងរៀបចំបញ្ចូលសំឡេងខ្មែរ...");
-    const audioArgs = ["-y", "-threads", "1"];
-    for (const audioPath of audioFiles) audioArgs.push("-i", audioPath);
-
-    const audioFilters = [];
-    if (segments.length === 1) {
-      const delay = Math.max(0, Math.round(segments[0].start * 1000));
-      audioFilters.push(`[0:a]adelay=${delay}:all=1,aresample=44100,alimiter=limit=0.95,apad[mixed]`);
-    } else {
-      const mixInputs = [];
-      for (let i = 0; i < segments.length; i++) {
-        const delay = Math.max(0, Math.round(segments[i].start * 1000));
-        audioFilters.push(`[${i}:a]adelay=${delay}:all=1,aresample=44100[voice${i}]`);
-        mixInputs.push(`[voice${i}]`);
+    const BATCH_SIZE = 25;
+    for (let startIdx = 0; startIdx < segments.length; startIdx += BATCH_SIZE) {
+      const slice = [];
+      for (let j = startIdx; j < Math.min(startIdx + BATCH_SIZE, segments.length); j++) {
+        slice.push({ path: audioFiles[j], start: segments[j].start });
       }
-      audioFilters.push(`${mixInputs.join("")}amix=inputs=${segments.length}:duration=longest:dropout_transition=0:normalize=0,aresample=44100,alimiter=limit=0.95,apad[mixed]`);
+      const batchPath = path.join(workDir, `batch-${batchFiles.length}.m4a`);
+      await mixAudioBatch(slice, batchPath);
+      batchFiles.push(batchPath);
     }
 
-    audioArgs.push(
+    const durStr = targetDuration.toFixed(3);
+    const finalAudioArgs = ["-y", "-threads", "1"];
+    for (const bf of batchFiles) finalAudioArgs.push("-i", bf);
+
+    const finalFilters = [];
+    if (batchFiles.length === 1) {
+      finalFilters.push(`[0:a]aresample=44100,alimiter=limit=0.95,apad=whole_dur=${durStr}[mixed]`);
+    } else {
+      const bLabels = batchFiles.map((_, idx) => `[${idx}:a]`).join("");
+      finalFilters.push(`${bLabels}amix=inputs=${batchFiles.length}:duration=longest:dropout_transition=0:normalize=0,aresample=44100,alimiter=limit=0.95,apad=whole_dur=${durStr}[mixed]`);
+    }
+
+    finalAudioArgs.push(
       "-filter_threads", "1",
       "-filter_complex_threads", "1",
-      "-filter_complex", audioFilters.join(";"),
+      "-filter_complex", finalFilters.join(";"),
       "-map", "[mixed]",
       "-c:a", "aac",
       "-b:a", "128k",
-      "-threads", "1"
+      "-t", durStr,
+      "-threads", "1",
+      mixedAudioPath
     );
-    if (Number.isFinite(duration) && duration > 0) audioArgs.push("-t", String(duration));
-    audioArgs.push(mixedAudioPath);
-
-    await runFfmpeg(audioArgs, 8 * 60 * 1000);
+    await runFfmpeg(finalAudioArgs, 3 * 60 * 1000);
 
     if (onProgress) onProgress(85, "កំពុងភ្ជាប់សំឡេងខ្មែរចូលវីដេអូ...");
     const copyMuxArgs = [
@@ -532,14 +578,13 @@ async function createDubbedVideo(options) {
       "-map", "1:a:0",
       "-c:v", "copy",
       "-c:a", "copy",
-      "-shortest",
-      "-movflags", "+faststart"
+      "-t", durStr,
+      "-movflags", "+faststart",
+      outputPath
     ];
-    if (Number.isFinite(duration) && duration > 0) copyMuxArgs.push("-t", String(duration));
-    copyMuxArgs.push(outputPath);
 
     try {
-      await runFfmpeg(copyMuxArgs, 5 * 60 * 1000);
+      await runFfmpeg(copyMuxArgs, 3 * 60 * 1000);
     } catch (_) {
       const fallbackArgs = [
         "-y",
@@ -554,18 +599,19 @@ async function createDubbedVideo(options) {
         "-pix_fmt", "yuv420p",
         "-threads", "1",
         "-c:a", "copy",
-        "-shortest",
+        "-t", durStr,
         "-movflags", "+faststart",
         outputPath
       ];
-      await runFfmpeg(fallbackArgs, 15 * 60 * 1000);
+      await runFfmpeg(fallbackArgs, 10 * 60 * 1000);
     }
 
     const outStat = await fs.promises.stat(outputPath);
     if (!outStat.size) throw new Error("វីដេអូ MP4 ដែលបានបង្កើតមានទំហំសូន្យ");
-    return { outputPath, size: outStat.size, duration: duration || null, segments: segments.length };
+    return { outputPath, size: outStat.size, duration: targetDuration, segments: segments.length };
   } finally {
     await fs.promises.unlink(mixedAudioPath).catch(() => {});
+    for (const bf of batchFiles) await fs.promises.unlink(bf).catch(() => {});
     for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
   }
 }
@@ -595,6 +641,7 @@ function createJob(map, inputPath, originalName, voice) {
   return job;
 }
 
+    
 function updateJob(job, status, progress, message) {
   job.status = status;
   job.progress = Math.max(0, Math.min(100, Number(progress) || 0));
