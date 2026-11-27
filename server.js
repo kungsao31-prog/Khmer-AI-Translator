@@ -20,12 +20,39 @@ const GEMINI_TEXT_MODEL = (!RAW_TEXT_MODEL || RAW_TEXT_MODEL.includes("2.0") || 
 
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const UPLOAD_DIR = path.join(TMP, "uploads");
+const JOBS_FILE = path.join(TMP, "jobs-state.json");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const TTS_CONCURRENCY = 2;
 const jobs = new Map();
 let activeMediaJobId = null;
 let edgeTtsCooldownUntil = 0;
+
+function saveJobsToDisk() {
+  try {
+    const arr = Array.from(jobs.values()).slice(-20);
+    fs.writeFileSync(JOBS_FILE, JSON.stringify(arr), "utf8");
+  } catch (_) {}
+}
+
+function loadJobsFromDisk() {
+  try {
+    if (!fs.existsSync(JOBS_FILE)) return;
+    const arr = JSON.parse(fs.readFileSync(JOBS_FILE, "utf8"));
+    if (!Array.isArray(arr)) return;
+    for (const item of arr) {
+      if (item && item.id) {
+        if (item.status === "processing" || item.status === "queued") {
+          item.status = "failed";
+          item.error = "Server បានចាប់ផ្តើមឡើងវិញ សូមចុចបកប្រែម្តងទៀត";
+          item.message = item.error;
+        }
+        jobs.set(item.id, item);
+      }
+    }
+  } catch (_) {}
+}
+loadJobsFromDisk();
 
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
@@ -158,8 +185,8 @@ async function createKhmerSpeech(text, outPath, voiceGender = "female") {
   }
 
   await synthesizeWithGoogleFallback(cleanText, outPath);
-    }
-        function getUniqueModels(primary) {
+  }
+      function getUniqueModels(primary) {
   const list = [primary, "gemini-3.8-flash", "gemini-3.5-flash-lite"].filter(Boolean);
   return [...new Set(list.filter((m) => !m.includes("2.0") && !m.includes("2.5")))];
 }
@@ -362,8 +389,8 @@ async function translateTextWithFallback(text, style = "natural") {
     }
   }
   throw lastError || new Error("បកប្រែអត្ថបទបរាជ័យ");
-                             }
-      function formatAssTime(seconds) {
+  }
+   function formatAssTime(seconds) {
   const totalCs = Math.max(0, Math.round(Number(seconds || 0) * 100));
   const cs = totalCs % 100;
   const totalSec = Math.floor(totalCs / 100);
@@ -410,15 +437,15 @@ async function createAssSubtitle(segments, videoTitle, assPath) {
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
-    "PlayResX: 720",
-    "PlayResY: 1280",
+    "PlayResX: 480",
+    "PlayResY: 854",
     "ScaledBorderAndShadow: yes",
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Default,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
-    "Style: Subtitle,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
-    "Style: Title,Noto Sans Khmer,38,&H0000E5FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2.5,1,8,36,36,92,1",
+    "Style: Default,Noto Sans Khmer,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1.8,1,2,24,24,88,1",
+    "Style: Subtitle,Noto Sans Khmer,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1.8,1,2,24,24,88,1",
+    "Style: Title,Noto Sans Khmer,26,&H0000E5FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,1,8,24,24,60,1",
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -443,7 +470,7 @@ async function createAssSubtitle(segments, videoTitle, assPath) {
   await fs.promises.writeFile(assPath, content, "utf8");
 }
 
-function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
+function runFfmpeg(args, timeoutMs = 20 * 60 * 1000) {
   return new Promise((resolve, reject) => {
     const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -519,41 +546,35 @@ async function createDubbedVideo(options) {
     if (Number.isFinite(duration) && duration > 0) audioArgs.push("-t", String(duration));
     audioArgs.push(mixedAudioPath);
 
-    await runFfmpeg(audioArgs, 15 * 60 * 1000);
+    await runFfmpeg(audioArgs, 10 * 60 * 1000);
 
-    if (onProgress) onProgress(78, "កំពុងបាំងអក្សរចាស់ ដាក់អក្សរខ្មែរ និងផលិតវីដេអូ...");
+    if (onProgress) onProgress(78, "កំពុងដាក់អក្សរខ្មែរ និងផលិតវីដេអូ...");
     await createAssSubtitle(segments, videoTitle, assPath);
     const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
     const hasTitle = Boolean(String(videoTitle || "").trim());
 
-    const filters = [
-      "[0:v]scale=w='if(gt(iw,ih),min(1280,iw),min(720,iw))':h='if(gt(iw,ih),min(720,ih),min(1280,ih))':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2[vscaled]"
+    const vfChain = [
+      "scale=w='if(gt(iw,ih),min(854,iw),min(480,iw))':h='if(gt(iw,ih),min(480,ih),min(854,ih))':force_original_aspect_ratio=decrease",
+      "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+      "drawbox=x=0:y='trunc(ih*0.77/2)*2':w=iw:h='trunc(ih*0.15/2)*2':color=black@0.65:t=fill"
     ];
     if (hasTitle) {
-      filters.push("[vscaled]split=3[base][topraw][botraw]");
-      filters.push("[topraw]crop=w=iw:h='trunc(ih*0.13/2)*2':x=0:y='trunc(ih*0.05/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
-      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][topblur]overlay=x=0:y='trunc(H*0.05/2)*2'[v1]");
-      filters.push("[v1][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
-    } else {
-      filters.push("[vscaled]split=2[base][botraw]");
-      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
+      vfChain.push("drawbox=x=0:y='trunc(ih*0.05/2)*2':w=iw:h='trunc(ih*0.13/2)*2':color=black@0.60:t=fill");
     }
-
-    filters.push(`[vmasked]ass='${escapedAss}'[vout]`);
+    vfChain.push(`ass='${escapedAss}'`);
 
     const videoArgs = [
       "-y",
       "-i", inputPath,
       "-i", mixedAudioPath,
-      "-filter_complex", filters.join(";"),
-      "-map", "[vout]",
+      "-vf", vfChain.join(","),
+      "-map", "0:v:0",
       "-map", "1:a:0",
+      "-r", "24",
       "-c:v", "libx264",
       "-preset", "ultrafast",
       "-tune", "zerolatency",
-      "-crf", "25",
+      "-crf", "26",
       "-pix_fmt", "yuv420p",
       "-threads", "1",
       "-c:a", "copy",
@@ -563,7 +584,7 @@ async function createDubbedVideo(options) {
     if (Number.isFinite(duration) && duration > 0) videoArgs.push("-t", String(duration));
     videoArgs.push(outputPath);
 
-    await runFfmpeg(videoArgs, 60 * 60 * 1000);
+    await runFfmpeg(videoArgs, 20 * 60 * 1000);
     const outStat = await fs.promises.stat(outputPath);
     if (!outStat.size) throw new Error("វីដេអូ MP4 ដែលបានបង្កើតមានទំហំសូន្យ");
     return { outputPath, size: outStat.size, duration: duration || null, segments: segments.length };
@@ -595,6 +616,7 @@ function createJob(map, inputPath, originalName, voice) {
     finishedAt: null
   };
   map.set(id, job);
+  saveJobsToDisk();
   return job;
 }
 
@@ -603,6 +625,7 @@ function updateJob(job, status, progress, message) {
   job.progress = Math.max(0, Math.min(100, Number(progress) || 0));
   job.message = message || "";
   job.updatedAt = Date.now();
+  saveJobsToDisk();
 }
 
 async function processVideoJob(job) {
@@ -772,7 +795,16 @@ app.post(["/api/translate-series", "/api/batch-video", "/api/merge-episodes", "/
 app.get(["/api/jobs/:id", "/api/video/jobs/:id", "/api/status/:id", "/api/video/status/:id", "/api/tasks/:id"], (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) {
-    return res.status(404).json({ ok: false, success: false, error: "រកមិនឃើញលេខកូដការងារនេះទេ (Server អាចទើបតែចាប់ផ្តើមឡើងវិញ)" });
+    return res.json({
+      ok: false,
+      success: false,
+      id: req.params.id,
+      status: "failed",
+      done: true,
+      progress: 0,
+      error: "Server បានចាប់ផ្តើមឡើងវិញ សូមចុចបកប្រែម្តងទៀត",
+      message: "Server បានចាប់ផ្តើមឡើងវិញ សូមចុចបកប្រែម្តងទៀត"
+    });
   }
   const videoUrl = job.output ? `/api/jobs/${job.id}/video` : null;
   const srtUrl = job.segments.length ? `/api/jobs/${job.id}/srt` : null;
@@ -782,7 +814,7 @@ app.get(["/api/jobs/:id", "/api/video/jobs/:id", "/api/status/:id", "/api/video/
     id: job.id,
     jobId: job.id,
     status: job.status,
-    done: job.status === "completed",
+    done: job.status === "completed" || job.status === "failed",
     progress: job.progress,
     message: job.message,
     videoUrl,
@@ -836,7 +868,7 @@ app.post(["/api/translate-text", "/api/text/translate", "/api/translate"], async
     if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទដែលត្រូវបកប្រែ" });
     const style = String(req.body?.style || "natural").trim();
     const translation = await translateTextWithFallback(text, style);
-    res.json({ ok: true, success: true, translation, translatedText: translatedTextWithFallback ? translation : translation, result: translation });
+    res.json({ ok: true, success: true, translation, translatedText: translation, result: translation });
   } catch (err) {
     res.status(500).json({ ok: false, success: false, error: err.message });
   }
@@ -869,4 +901,10 @@ app.get("*", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("===============================
+  console.log("================================");
+  console.log("Khmer AI Translator Pro");
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Gemini configured: ${Boolean(API_KEY)}`);
+  console.log("================================");
+});
+      
