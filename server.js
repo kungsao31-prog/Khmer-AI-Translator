@@ -230,7 +230,9 @@ async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
         console.log(`[GeminiAnalyze] Trying model: ${model}`);
         if (onProgress) onProgress(32, `AI (${model}) កំពុងស្តាប់ បកប្រែ និងបែងចែកតួអង្គ...`);
 
-        const analyzeUrl = "https:" + "//[generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/)" + encodeURIComponent(model) + ":generateContent";
+              const geminiHost = ["generativelanguage", "googleapis", "com"].join(".");
+        const analyzeUrl = "https://" + geminiHost + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+
         const res = await geminiFetchWithRetry(
           analyzeUrl,
           {
@@ -296,7 +298,7 @@ async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
   }
 }
 
-async function synthesizeWithGoogleFallback(text, outPath) {
+asasync function synthesizeWithGoogleFallback(text, outPath) {
   const clean = String(text || "").trim();
   const chunks = [];
   for (let i = 0; i < clean.length; i += 180) {
@@ -304,8 +306,10 @@ async function synthesizeWithGoogleFallback(text, outPath) {
   }
   const buffers = [];
   for (const chunk of chunks) {
-    const url = "https:" + "//[translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=](https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=)" + encodeURIComponent(chunk);
-    const res = await fetch(url, {
+      const ttsHost = ["translate", "google", "com"].join(".");
+    const url = "https://" + ttsHost + "/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=" + encodeURIComponent(chunk);
+          const res = await fetch(url, {
+            
       headers: { "User-Agent": "Mozilla/5.0" }
     });
     if (!res.ok) throw new Error(`Google TTS HTTP ${res.status}`);
