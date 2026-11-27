@@ -667,10 +667,11 @@ app.post(["/api/translate-video", "/api/video/translate", "/api/jobs/video", "/a
       fs.promises.unlink(file.path).catch(() => {});
       return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងបកប្រែវីដេអូមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
     }
-    const voice = String(req.body?.voice || "auto").trim();
+        const voice = String(req.body?.voice || req.body?.gender || "auto").trim();
     const job = createJob(jobs, file.path, file.originalname, voice);
     processVideoJob(job).catch(() => {});
-    res.json({
+    res.status(202).json({
+      
       ok: true,
       success: true,
       status: job.status,
