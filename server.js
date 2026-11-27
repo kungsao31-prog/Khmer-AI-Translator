@@ -661,18 +661,30 @@ app.post(["/api/translate-video", "/api/video/translate", "/api/jobs/video", "/a
   try {
     const file = Array.isArray(req.files) && req.files[0];
     if (!file) {
-      return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសឯកសារវីដេអូជាមុនសិន" });
+      return res.status(400).json({ ok: false, success: false, error: "សូមជ្រើសរើសឯកសារវីដេអូជាមុនសិន" });
     }
     if (activeMediaJobId) {
       fs.promises.unlink(file.path).catch(() => {});
-      return res.status(409).json({ ok: false, error: "ប្រព័ន្ធកំពុងបកប្រែវីដេអូមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
+      return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងបកប្រែវីដេអូមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
     }
     const voice = String(req.body?.voice || "auto").trim();
     const job = createJob(jobs, file.path, file.originalname, voice);
     processVideoJob(job).catch(() => {});
-    res.json({ ok: true, id: job.id, jobId: job.id, job });
+    res.json({
+      ok: true,
+      success: true,
+      status: job.status,
+      id: job.id,
+      jobId: job.id,
+      job_id: job.id,
+      taskId: job.id,
+      task_id: job.id,
+      uuid: job.id,
+      data: { id: job.id, jobId: job.id, job_id: job.id, status: job.status },
+      job
+    });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -681,32 +693,58 @@ app.post(["/api/translate-series", "/api/batch-video", "/api/merge-episodes", "/
     const files = Array.isArray(req.files) ? req.files : [];
     if (files.length < 2) {
       for (const f of files) fs.promises.unlink(f.path).catch(() => {});
-      return res.status(400).json({ ok: false, error: "សូមជ្រើសរើសវីដេអូចាប់ពី ២ ភាគឡើងទៅ" });
+      return res.status(400).json({ ok: false, success: false, error: "សូមជ្រើសរើសវីដេអូចាប់ពី ២ ភាគឡើងទៅ" });
     }
     if (activeMediaJobId) {
       for (const f of files) fs.promises.unlink(f.path).catch(() => {});
-      return res.status(409).json({ ok: false, error: "ប្រព័ន្ធកំពុងដំណើរការការងារផ្សេង សូមរង់ចាំបន្តិច" });
+      return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងដំណើរការការងារផ្សេង សូមរង់ចាំបន្តិច" });
     }
     const voice = String(req.body?.voice || "auto").trim();
     const job = createJob(jobs, files[0].path, `${files.length} episodes`, voice);
     processSeriesJob(job, files).catch(() => {});
-    res.json({ ok: true, id: job.id, jobId: job.id, job });
+    res.json({
+      ok: true,
+      success: true,
+      status: job.status,
+      id: job.id,
+      jobId: job.id,
+      job_id: job.id,
+      taskId: job.id,
+      task_id: job.id,
+      uuid: job.id,
+      data: { id: job.id, jobId: job.id, job_id: job.id, status: job.status },
+      job
+    });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 
 app.get(["/api/jobs/:id", "/api/video/status/:id", "/api/status/:id", "/api/video/jobs/:id"], (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, error: "រកមិនឃើញទិន្នន័យការងារនេះទេ" });
-  const downloadUrl = job.output ? `/api/jobs/${job.id}/download` : null;
-  res.json({ ok: true, ...job, downloadUrl, videoUrl: downloadUrl });
+  if (!job) return res.status(404).json({ ok: false, success: false, error: "រកមិនឃើញទិន្នន័យការងារនេះទេ" });
+  const downloadUrl = job.output ? `/api/video/jobs/${job.id}/download` : null;
+  res.json({
+    ok: true,
+    success: true,
+    ...job,
+    jobId: job.id,
+    job_id: job.id,
+    downloadUrl,
+    download_url: downloadUrl,
+    videoUrl: downloadUrl,
+    video_url: downloadUrl,
+    resultUrl: downloadUrl,
+    outputUrl: downloadUrl,
+    url: downloadUrl,
+    data: { ...job, downloadUrl, videoUrl: downloadUrl }
+  });
 });
 
 app.get(["/api/jobs/:id/download", "/api/video/download/:id", "/api/download/:id", "/api/video/jobs/:id/download"], (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job || !job.output || !fs.existsSync(job.output)) {
-    return res.status(404).json({ ok: false, error: "ឯកសារវីដេអូមិនទាន់រួចរាល់ ឬត្រូវបានលុបហើយ" });
+    return res.status(404).json({ ok: false, success: false, error: "ឯកសារវីដេអូមិនទាន់រួចរាល់ ឬត្រូវបានលុបហើយ" });
   }
   const baseName = path.parse(job.originalName || "video").name.replace(/[^\w\u1780-\u17FF-]+/g, "_");
   res.download(job.output, `${baseName}_Khmer.mp4`);
@@ -724,10 +762,11 @@ app.get(["/api/jobs", "/api/video/jobs"], (req, res) => {
       originalName: j.originalName,
       videoTitle: j.videoTitle,
       createdAt: j.createdAt,
-      downloadUrl: j.output ? `/api/jobs/${j.id}/download` : null
+      downloadUrl: j.output ? `/api/video/jobs/${j.id}/download` : null
     }));
-  res.json({ ok: true, jobs: list });
+  res.json({ ok: true, success: true, jobs: list });
 });
+
 
 app.post(["/api/translate-text", "/api/translate"], async (req, res) => {
   try {
