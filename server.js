@@ -1021,7 +1021,7 @@ app.get("/api/*", (req, res) => {
   }
   return res.status(404).json({ ok: false, error: `រកមិនឃើញតំណភ្ជាប់ API (${req.path})` });
 });
-        okp.get("*", (req, res) => {
+        app.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ ok: false, error: "រកមិនឃើញតំណភ្ជាប់ API នេះទេ" });
   }
@@ -1037,7 +1037,8 @@ app.get("/api/*", (req, res) => {
   if (fs.existsSync(publicIndex)) {
     return res.sendFile(publicIndex);
   }
-  const rootIndex = path.join(__dirname, "index.html");
+    const rootIndex = path.join(__dirname, "index.html");
+
   if (fs.existsSync(rootIndex)) {
     return res.sendFile(rootIndex);
   }
