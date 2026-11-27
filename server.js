@@ -1,8 +1,8 @@
 const express = require("express");
-const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const multer = require("multer");
 const { randomUUID } = require("crypto");
 const { spawn } = require("child_process");
 
@@ -11,8 +11,12 @@ const PORT = Number(process.env.PORT) || 10000;
 const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
 const RAW_VIDEO_MODEL = (process.env.GEMINI_VIDEO_MODEL || "").trim();
 const RAW_TEXT_MODEL = (process.env.GEMINI_TEXT_MODEL || "").trim();
-const GEMINI_VIDEO_MODEL = (!RAW_VIDEO_MODEL || RAW_VIDEO_MODEL.includes("2.0")) ? "gemini-3.8-flash" : RAW_VIDEO_MODEL;
-const GEMINI_TEXT_MODEL = (!RAW_TEXT_MODEL || RAW_TEXT_MODEL.includes("2.0")) ? "gemini-3.8-flash" : RAW_TEXT_MODEL;
+const GEMINI_VIDEO_MODEL = (!RAW_VIDEO_MODEL || RAW_VIDEO_MODEL.includes("2.0") || RAW_VIDEO_MODEL.includes("2.5"))
+  ? "gemini-3.8-flash"
+  : RAW_VIDEO_MODEL;
+const GEMINI_TEXT_MODEL = (!RAW_TEXT_MODEL || RAW_TEXT_MODEL.includes("2.0") || RAW_TEXT_MODEL.includes("2.5"))
+  ? "gemini-3.8-flash"
+  : RAW_TEXT_MODEL;
 
 const TMP = path.join(os.tmpdir(), "khmer-ai-translator");
 const UPLOAD_DIR = path.join(TMP, "uploads");
@@ -21,6 +25,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const TTS_CONCURRENCY = 2;
 const jobs = new Map();
 let activeMediaJobId = null;
+let edgeTtsCooldownUntil = 0;
 
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
@@ -29,299 +34,22 @@ const publicDir = path.join(__dirname, "public");
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
 }
-app.use(express.static(__dirname));
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || ".mp4") || ".mp4";
+    cb(null, `${Date.now()}-${randomUUID()}${ext}`);
+  }
+});
 const upload = multer({
-  dest: UPLOAD_DIR,
+  storage,
   limits: { fileSize: 1024 * 1024 * 1024 }
 });
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-async function runWithConcurrency(items, limit, worker) {
-  const results = new Array(items.length);
-  let cursor = 0;
-  async function next() {
-    while (cursor < items.length) {
-      const idx = cursor++;
-      results[idx] = await worker(items[idx], idx);
-    }
-  }
-  const runners = Array.from({ length: Math.min(limit, items.length) }, () => next());
-  await Promise.all(runners);
-  return results;
-}
-
-function getMimeType(filePath, originalName = "") {
-  const ext = path.extname(originalName || filePath).toLowerCase();
-  const map = {
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".mkv": "video/x-matroska",
-    ".webm": "video/webm",
-    ".avi": "video/x-msvideo",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".m4a": "audio/mp4"
-  };
-  return map[ext] || "video/mp4";
-}
-
-function getUniqueModels(primary) {
-  const list = [
-    "gemini-2.5-flash",
-    primary,
-    GEMINI_VIDEO_MODEL,
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash"
-  ].filter(Boolean);
-  return [...new Set(list)];
-}
-
-async function geminiFetchWithRetry(url, options, maxAttempts = 2, timeoutMs = 45000) {
-  let lastError = null;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      if (res.ok) return res;
-      let errMsg = `HTTP ${res.status}`;
-      try {
-        const data = await res.json();
-        errMsg = data?.error?.message || errMsg;
-      } catch (_) {}
-      lastError = new Error(errMsg);
-      if (![429, 500, 502, 503, 504].includes(res.status)) {
-        throw lastError;
-      }
-    } catch (err) {
-      lastError = err.name === "AbortError"
-        ? new Error("ការតភ្ជាប់ទៅ Gemini AI លើសពេលកំណត់ (Timeout)")
-        : err;
-      if (attempt === maxAttempts - 1) break;
-    } finally {
-      clearTimeout(timer);
-    }
-    await sleep(1500 * (attempt + 1));
-  }
-  throw lastError || new Error("Gemini API មិនឆ្លើយតប");
-}
-
-async function uploadGeminiFile(filePath, mimeType, displayName, onProgress) {
-  const stat = await fs.promises.stat(filePath);
-  console.log(`[GeminiUpload] Starting upload (${Math.round(stat.size / 1024)} KB)`);
-  if (onProgress) onProgress(20, "កំពុងបញ្ជូនវីដេអូទៅកាន់ AI...");
-
-  const start = await geminiFetchWithRetry(
-    "https:" + "//generativelanguage.googleapis.com/upload/v1beta/files",
-    {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": API_KEY,
-        "X-Goog-Upload-Protocol": "resumable",
-        "X-Goog-Upload-Command": "start",
-        "X-Goog-Upload-Header-Content-Length": String(stat.size),
-        "X-Goog-Upload-Header-Content-Type": mimeType,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ file: { display_name: displayName || path.basename(filePath) } })
-    },
-    2,
-    30000
-  );
-
-  const uploadUrl = start.headers.get("x-goog-upload-url");
-  if (!uploadUrl) throw new Error("មិនអាចទទួលបានតំណផ្ទុកឯកសារទៅ Gemini ទេ");
-
-  const fileBuffer = await fs.promises.readFile(filePath);
-  const finish = await geminiFetchWithRetry(
-    uploadUrl,
-    {
-      method: "POST",
-      headers: {
-        "Content-Length": String(stat.size),
-        "X-Goog-Upload-Offset": "0",
-        "X-Goog-Upload-Command": "upload, finalize"
-      },
-      body: fileBuffer
-    },
-    2,
-    60000
-  );
-
-  const uploaded = await finish.json();
-  let fileInfo = uploaded.file || uploaded;
-  if (!fileInfo || !fileInfo.name) throw new Error("ការផ្ទុកវីដេអូទៅ Gemini បរាជ័យ");
-
-  if (onProgress) onProgress(26, "AI កំពុងរៀបចំឯកសារវីដេអូ...");
-  for (let i = 0; i < 30; i++) {
-    if (fileInfo.state === "ACTIVE") {
-      console.log(`[GeminiUpload] File ACTIVE: ${fileInfo.name}`);
-      return fileInfo;
-    }
-    if (fileInfo.state === "FAILED") {
-      throw new Error("Gemini មិនអាចដំណើរការឯកសារវីដេអូនេះបានទេ");
-    }
-    await sleep(2000);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    try {
-      const check = await fetch("https:" + "//generativelanguage.googleapis.com/v1beta/" + fileInfo.name, {
-        headers: { "x-goog-api-key": API_KEY },
-        signal: controller.signal
-      });
-      if (check.ok) {
-        const data = await check.json();
-        fileInfo = data.file || data;
-      }
-    } catch (_) {
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  throw new Error("AI រៀបចំឯកសារវីដេអូលើសពេលកំណត់ សូមសាកល្បងម្តងទៀត");
-}
-
-async function deleteGeminiFile(fileName) {
-  if (!fileName || !API_KEY) return;
-  await fetch("https:" + "//generativelanguage.googleapis.com/v1beta/" + fileName, {
-    method: "DELETE",
-    headers: { "x-goog-api-key": API_KEY }
-  }).catch(() => {});
-}
-
-function parseJsonResponse(rawText) {
-  const cleaned = String(rawText || "")
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
-  return JSON.parse(cleaned);
-}
-
-async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
-  if (!API_KEY) {
-    throw new Error("មិនទាន់បានកំណត់ GEMINI_API_KEY នៅលើ Server ទេ");
-  }
-
-  const mimeType = getMimeType(videoPath, originalName);
-  const uploadedFile = await uploadGeminiFile(videoPath, mimeType, originalName, onProgress);
-
-  const prompt = [
-    "You are an expert video translator and Khmer dubbing scriptwriter.",
-    "Listen carefully to all spoken dialogue and read any on-screen title in this video.",
-    "Translate everything into natural, fluent, conversational Khmer.",
-    "Rules:",
-    "1. Return ONLY valid JSON with this exact schema:",
-    '{"sourceLanguage":"string","videoTitle":"short Khmer title for top banner (max 45 chars, empty if none)","segments":[{"start":0.0,"end":2.5,"speaker":"male or female","text":"Khmer translation"}]}',
-    "2. Detect speaker gender accurately ('male' or 'female') for every spoken line.",
-    "3. Keep 'start' and 'end' timestamps in seconds (numbers) matching the speech timing accurately without overlapping.",
-    "4. Keep each Khmer segment concise so the Khmer voiceover fits comfortably within its start-to-end window.",
-    "5. Use natural Khmer phrasing, proper Khmer punctuation, and zero English/Chinese words unless unavoidable proper names."
-  ].join("\n");
-
-  const models = getUniqueModels(GEMINI_VIDEO_MODEL);
-  let lastError = null;
-
-  try {
-    for (const model of models) {
-      try {
-        console.log(`[GeminiAnalyze] Trying model: ${model}`);
-        if (onProgress) onProgress(32, `AI (${model}) កំពុងស្តាប់ បកប្រែ និងបែងចែកតួអង្គ...`);
-
-              const geminiHost = ["generativelanguage", "googleapis", "com"].join(".");
-        const analyzeUrl = "https://" + geminiHost + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
-
-        const res = await geminiFetchWithRetry(
-          analyzeUrl,
-          {
-            method: "POST",
-            headers: {
-              "x-goog-api-key": API_KEY,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { file_data: { mime_type: uploadedFile.mimeType || mimeType, file_uri: uploadedFile.uri } },
-                    { text: prompt }
-                  ]
-                }
-              ],
-              generationConfig: {
-                temperature: 0.2,
-                responseMimeType: "application/json"
-              }
-            })
-          },
-          2,
-          60000
-        );
-
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-        const parsed = parseJsonResponse(text);
-        const rawSegments = Array.isArray(parsed.segments) ? parsed.segments : [];
-
-        const segments = rawSegments
-          .map((seg, idx) => {
-            const start = Math.max(0, Number(seg.start) || 0);
-            const end = Math.max(start + 0.6, Number(seg.end) || start + 2.0);
-            const sp = String(seg.speaker || "").toLowerCase();
-            const speaker = sp.includes("male") && !sp.includes("female") ? "male" : "female";
-            const cleanText = String(seg.text || "").trim();
-            return { index: idx, start, end, speaker, text: cleanText };
-          })
-          .filter((s) => s.text.length > 0);
-
-        if (!segments.length) {
-          throw new Error("AI មិនអាចស្គាល់សំឡេងនិយាយនៅក្នុងវីដេអូនេះបានទេ");
-        }
-
-        console.log(`[GeminiAnalyze] Success with ${model}: ${segments.length} segments`);
-        return {
-          provider: model,
-          sourceLanguage: parsed.sourceLanguage || "auto",
-          videoTitle: String(parsed.videoTitle || "").trim(),
-          segments
-        };
-      } catch (err) {
-        console.error(`[GeminiAnalyze] Failed with ${model}: ${err.message}`);
-        lastError = err;
-      }
-    }
-    throw lastError || new Error("ការវិភាគវីដេអូជាមួយ Gemini បរាជ័យ");
-  } finally {
-    await deleteGeminiFile(uploadedFile.name);
-  }
-}
-
-async function synthesizeWithGoogleFallback(text, outPath) {
-  const clean = String(text || "").trim();
-  const chunks = [];
-  for (let i = 0; i < clean.length; i += 180) {
-    chunks.push(clean.slice(i, i + 180));
-  }
-  const buffers = [];
-  for (const chunk of chunks) {
-      const ttsHost = ["translate", "google", "com"].join(".");
-    const url = "https://" + ttsHost + "/translate_tts?ie=UTF-8&client=tw-ob&tl=km&q=" + encodeURIComponent(chunk);
-          const res = await fetch(url, {
-            
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
-    if (!res.ok) throw new Error(`Google TTS HTTP ${res.status}`);
-    const arr = await res.arrayBuffer();
-    buffers.push(Buffer.from(arr));
-  }
-  await fs.promises.writeFile(outPath, Buffer.concat(buffers));
-}
-
-let edgeTtsCooldownUntil = 0;
 
 function runWithTimeout(promise, ms, label = "timeout") {
   let timer;
@@ -331,6 +59,57 @@ function runWithTimeout(promise, ms, label = "timeout") {
       timer = setTimeout(() => reject(new Error(label)), ms);
     })
   ]).finally(() => clearTimeout(timer));
+}
+
+async function runWithConcurrency(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) break;
+      results[idx] = await worker(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+function splitKhmerText(text, maxLen = 170) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  if (clean.length <= maxLen) return [clean];
+  const chunks = [];
+  let rest = clean;
+  while (rest.length > maxLen) {
+    let cut = rest.lastIndexOf(" ", maxLen);
+    if (cut < Math.floor(maxLen * 0.5)) cut = maxLen;
+    chunks.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) chunks.push(rest);
+  return chunks;
+}
+
+async function synthesizeWithGoogleFallback(text, outPath) {
+  const chunks = splitKhmerText(text, 170);
+  if (!chunks.length) throw new Error("គ្មានអត្ថបទសម្រាប់បង្កើតសំឡេងទេ");
+  const buffers = [];
+  for (const chunk of chunks) {
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=km&client=tw-ob`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Referer": "https://translate.google.com/"
+      }
+    });
+    if (!res.ok) {
+      throw new Error(`Google TTS បរាជ័យ (${res.status})`);
+    }
+    const arr = await res.arrayBuffer();
+    buffers.push(Buffer.from(arr));
+  }
+  await fs.promises.writeFile(outPath, Buffer.concat(buffers));
 }
 
 async function createKhmerSpeech(text, outPath, voiceGender = "female") {
@@ -379,9 +158,212 @@ async function createKhmerSpeech(text, outPath, voiceGender = "female") {
   }
 
   await synthesizeWithGoogleFallback(cleanText, outPath);
+    }
+        function getUniqueModels(primary) {
+  const list = [primary, "gemini-3.8-flash", "gemini-3.5-flash-lite"].filter(Boolean);
+  return [...new Set(list.filter((m) => !m.includes("2.0") && !m.includes("2.5")))];
 }
 
-function formatAssTime(seconds) {
+function guessVideoMimeType(filePath) {
+  const ext = path.extname(filePath || "").toLowerCase();
+  if (ext === ".mov") return "video/quicktime";
+  if (ext === ".webm") return "video/webm";
+  if (ext === ".mkv") return "video/x-matroska";
+  if (ext === ".avi") return "video/x-msvideo";
+  return "video/mp4";
+}
+
+async function uploadGeminiFile(filePath, mimeType, displayName) {
+  const stat = await fs.promises.stat(filePath);
+  const startUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${encodeURIComponent(API_KEY)}`;
+  const startRes = await fetch(startUrl, {
+    method: "POST",
+    headers: {
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(stat.size),
+      "X-Goog-Upload-Header-Content-Type": mimeType,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ file: { display_name: displayName || "video.mp4" } })
+  });
+  if (!startRes.ok) {
+    const errTxt = await startRes.text();
+    throw new Error(`បង្ហោះវីដេអូទៅ Gemini បរាជ័យ (${startRes.status}): ${errTxt.slice(0, 200)}`);
+  }
+  const uploadUrl = startRes.headers.get("x-goog-upload-url");
+  if (!uploadUrl) throw new Error("មិនទទួលបានតំណបង្ហោះវីដេអូពី Gemini");
+
+  const fileBuffer = await fs.promises.readFile(filePath);
+  const uploadRes = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Length": String(stat.size),
+      "X-Goog-Upload-Offset": "0",
+      "X-Goog-Upload-Command": "upload, finalize"
+    },
+    body: fileBuffer
+  });
+  if (!uploadRes.ok) {
+    const errTxt = await uploadRes.text();
+    throw new Error(`បញ្ជូនឯកសារវីដេអូបរាជ័យ (${uploadRes.status}): ${errTxt.slice(0, 200)}`);
+  }
+  const uploadData = await uploadRes.json();
+  let fileInfo = uploadData.file || uploadData;
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (fileInfo.state === "ACTIVE") return fileInfo;
+    if (fileInfo.state === "FAILED") throw new Error("Gemini មិនអាចអានឯកសារវីដេអូនេះបានទេ");
+    await sleep(2000);
+    const checkRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileInfo.name}?key=${encodeURIComponent(API_KEY)}`);
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      fileInfo = checkData.file || checkData;
+    }
+  }
+  throw new Error("Gemini ចំណាយពេលរៀបចំវីដេអូយូរពេក");
+}
+
+async function deleteGeminiFile(fileName) {
+  if (!fileName || !API_KEY) return;
+  await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${encodeURIComponent(API_KEY)}`, {
+    method: "DELETE"
+  }).catch(() => {});
+}
+
+function parseGeminiJson(rawText) {
+  const cleaned = String(rawText || "")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error("AI មិនបានបញ្ជូនទម្រង់ JSON ត្រឹមត្រូវមកវិញទេ");
+  }
+  return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+}
+
+async function analyzeVideoWithFallback(filePath, originalName, onProgress) {
+  if (!API_KEY) throw new Error("មិនទាន់បានកំណត់ GEMINI_API_KEY នៅលើ Render ទេ");
+  const mimeType = guessVideoMimeType(filePath);
+  if (onProgress) onProgress(18, "កំពុងបញ្ជូនវីដេអូទៅឱ្យ AI វិភាគ...");
+  const uploaded = await uploadGeminiFile(filePath, mimeType, originalName);
+
+  const prompt = [
+    "You are an expert Chinese/English/Vietnamese/Thai-to-Khmer movie and drama translator and voice dubbing director.",
+    "Watch and listen to the entire video carefully, including spoken dialogue and on-screen captions.",
+    "Transcribe and translate every spoken line into natural, expressive, conversational Khmer suitable for voice-over dubbing.",
+    "Identify the speaker gender ('male' or 'female') for each segment based on voice and visual context.",
+    "Return ONLY valid JSON with this exact structure (no markdown, no extra commentary):",
+    "{",
+    '  "videoTitle": "ចំណងជើងរឿងខ្លីជាភាសាខ្មែរ (ឬទុកទទេបើមិនចាំបាច់)",',
+    '  "sourceLanguage": "zh",',
+    '  "segments": [',
+    '    { "start": 0.5, "end": 3.2, "speaker": "male", "text": "ប្រយោគបកប្រែជាភាសាខ្មែរ" }',
+    "  ]",
+    "}",
+    "Rules:",
+    "- start and end must be accurate timestamps in seconds (numbers) matching when the character speaks.",
+    "- Keep Khmer translations concise enough to be spoken naturally within the segment time window.",
+    "- Ensure segments do not overlap and are sorted chronologically."
+  ].join("\n");
+
+  const models = getUniqueModels(GEMINI_VIDEO_MODEL);
+  let lastError = null;
+
+  try {
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      if (onProgress) onProgress(28 + i * 5, `AI (${model}) កំពុងស្កេន និងបកប្រែសាច់រឿង...`);
+      try {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(API_KEY)}`;
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { file_data: { mime_type: mimeType, file_uri: uploaded.uri } },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error?.message || `HTTP ${res.status}`);
+        }
+        const textOut = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+        const parsed = parseGeminiJson(textOut);
+        const rawSegments = Array.isArray(parsed.segments) ? parsed.segments : [];
+        const segments = rawSegments
+          .map((s) => ({
+            start: Math.max(0, Number(s.start) || 0),
+            end: Math.max(0.5, Number(s.end) || (Number(s.start) || 0) + 2),
+            speaker: String(s.speaker || "female").toLowerCase().includes("male") && !String(s.speaker || "").toLowerCase().includes("female") ? "male" : "female",
+            text: String(s.text || "").trim()
+          }))
+          .filter((s) => s.text.length > 0)
+          .sort((a, b) => a.start - b.start);
+
+        if (!segments.length) {
+          throw new Error("AI មិនរកឃើញពាក្យសន្ទនានៅក្នុងវីដេអូនេះទេ");
+        }
+
+        return {
+          provider: model,
+          videoTitle: String(parsed.videoTitle || "").trim(),
+          sourceLanguage: String(parsed.sourceLanguage || "auto").trim(),
+          segments
+        };
+      } catch (err) {
+        lastError = err;
+        console.error(`[GeminiAnalyze] Failed with ${model}: ${err.message}`);
+      }
+    }
+    throw lastError || new Error("ការវិភាគវីដេអូជាមួយ Gemini បរាជ័យ");
+  } finally {
+    await deleteGeminiFile(uploaded.name);
+  }
+}
+
+async function translateTextWithFallback(text, style = "natural") {
+  if (!API_KEY) throw new Error("មិនទាន់បានកំណត់ GEMINI_API_KEY ទេ");
+  const models = getUniqueModels(GEMINI_TEXT_MODEL);
+  let lastError = null;
+  const prompt = `Translate the following text into fluent, natural Khmer (${style} tone). Return ONLY the Khmer translation without explanations:\n\n${text}`;
+
+  for (const model of models) {
+    try {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(API_KEY)}`;
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3 }
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+      const translated = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim();
+      if (translated) return translated;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("បកប្រែអត្ថបទបរាជ័យ");
+                             }
+      function formatAssTime(seconds) {
   const totalCs = Math.max(0, Math.round(Number(seconds || 0) * 100));
   const cs = totalCs % 100;
   const totalSec = Math.floor(totalCs / 100);
@@ -390,6 +372,17 @@ function formatAssTime(seconds) {
   const m = totalMin % 60;
   const h = Math.floor(totalMin / 60);
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+}
+
+function formatSrtTime(seconds) {
+  const totalMs = Math.max(0, Math.round(Number(seconds || 0) * 1000));
+  const ms = totalMs % 1000;
+  const totalSec = Math.floor(totalMs / 1000);
+  const s = totalSec % 60;
+  const totalMin = Math.floor(totalSec / 60);
+  const m = totalMin % 60;
+  const h = Math.floor(totalMin / 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
 function escapeAssText(text) {
@@ -411,6 +404,7 @@ function wrapKhmerText(text, maxChars = 34) {
   }
   return `${clean.slice(0, mid)}\\N${clean.slice(mid)}`;
 }
+
 async function createAssSubtitle(segments, videoTitle, assPath) {
   const maxEnd = segments.reduce((m, s) => Math.max(m, Number(s.end) || 0), 5) + 1.5;
   const header = [
@@ -450,7 +444,6 @@ async function createAssSubtitle(segments, videoTitle, assPath) {
 }
 
 function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
-    
   return new Promise((resolve, reject) => {
     const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
@@ -577,126 +570,6 @@ async function createDubbedVideo(options) {
   } finally {
     await fs.promises.unlink(assPath).catch(() => {});
     await fs.promises.unlink(mixedAudioPath).catch(() => {});
-    for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
-  }
-}
-
-  if (cleanTitle) {
-    events.push(`Dialogue: 1,0:00:00.00,${formatAssTime(maxEnd)},Title,,0,0,0,,${escapeAssText(wrapKhmerText(cleanTitle, 28))}`);
-  }
-
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const nextStart = i + 1 < segments.length ? segments[i + 1].start : seg.end + 0.5;
-    const start = Math.max(0, Number(seg.start) || 0);
-    const end = Math.max(start + 0.5, Math.min(Number(seg.end) || start + 2, Math.max(start + 0.5, nextStart - 0.05)));
-    const line = escapeAssText(wrapKhmerText(seg.text, 34));
-    events.push(`Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Subtitle,,0,0,0,,${line}`);
-  }
-
-  const content = "\uFEFF" + [...header, ...events].join("\n") + "\n";
-  await fs.promises.writeFile(assPath, content, "utf8");
-                             }function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
-    let stderr = "";
-    const timer = setTimeout(() => {
-      proc.kill("SIGKILL");
-      reject(new Error("FFmpeg ដំណើរការលើសពេលកំណត់"));
-    }, timeoutMs);
-
-    proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-      if (stderr.length > 6000) stderr = stderr.slice(-4000);
-    });
-
-    proc.on("error", (err) => {
-      clearTimeout(timer);
-      reject(new Error(`មិនអាចបើក FFmpeg បានទេ៖ ${err.message}`));
-    });
-
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0) return resolve();
-      const tail = stderr.trim().slice(-1200);
-      reject(new Error(`FFmpeg បរាជ័យ៖ ${tail}`));
-    });
-  });
-}
-
-async function createDubbedVideo(options) {
-  const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration, onProgress } = options;
-  if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
-  await fs.promises.mkdir(workDir, { recursive: true });
-  const audioFiles = [];
-  const assPath = path.join(workDir, "subtitles.ass");
-
-  try {
-    if (onProgress) onProgress(50, "កំពុងបង្កើតសំឡេងខ្មែរតួប្រុស និងតួស្រី...");
-    await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
-      const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
-      const segmentVoice = voice === "male"
-        ? "male"
-        : voice === "female_only"
-          ? "female"
-          : (segment.speaker === "male" ? "male" : "female");
-      await createKhmerSpeech(segment.text, audioPath, segmentVoice);
-      audioFiles[index] = audioPath;
-    });
-
-    if (onProgress) onProgress(70, "កំពុងបាំងអក្សរចាស់ ដាក់អក្សរខ្មែរ និងបញ្ចូលសំឡេង...");
-    await createAssSubtitle(segments, videoTitle, assPath);
-    const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
-    const hasTitle = Boolean(String(videoTitle || "").trim());
-    const args = ["-y", "-i", inputPath];
-    for (const audioPath of audioFiles) args.push("-i", audioPath);
-
-    const filters = [];
-    if (hasTitle) {
-      filters.push("[0:v]split=3[base][topraw][botraw]");
-      filters.push("[topraw]crop=w=iw:h='trunc(ih*0.13/2)*2':x=0:y='trunc(ih*0.05/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
-      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][topblur]overlay=x=0:y='trunc(H*0.05/2)*2'[v1]");
-      filters.push("[v1][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
-    } else {
-      filters.push("[0:v]split=2[base][botraw]");
-      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
-      filters.push("[base][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
-    }
-
-    filters.push(`[vmasked]ass='${escapedAss}'[vout]`);
-
-    const mixInputs = [];
-    for (let i = 0; i < segments.length; i++) {
-      const delay = Math.max(0, Math.round(segments[i].start * 1000));
-      filters.push(`[${i + 1}:a]adelay=${delay}:all=1,aresample=44100[voice${i}]`);
-      mixInputs.push(`[voice${i}]`);
-    }
-    filters.push(`${mixInputs.join("")}amix=inputs=${segments.length}:duration=longest:dropout_transition=0:normalize=0,aresample=44100,alimiter=limit=0.95,apad[mixed]`);
-
-    args.push(
-      "-filter_complex", filters.join(";"),
-      "-map", "[vout]",
-      "-map", "[mixed]",
-      "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-crf", "24",
-      "-pix_fmt", "yuv420p",
-      "-threads", "2",
-      "-c:a", "aac",
-      "-b:a", "192k",
-      "-shortest",
-      "-movflags", "+faststart"
-    );
-    if (Number.isFinite(duration) && duration > 0) args.push("-t", String(duration));
-    args.push(outputPath);
-
-    await runFfmpeg(args, 60 * 60 * 1000);
-    const outStat = await fs.promises.stat(outputPath);
-    if (!outStat.size) throw new Error("វីដេអូ MP4 ដែលបានបង្កើតមានទំហំសូន្យ");
-    return { outputPath, size: outStat.size, duration: duration || null, segments: segments.length };
-  } finally {
-    await fs.promises.unlink(assPath).catch(() => {});
     for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
   }
 }
@@ -843,11 +716,10 @@ app.post(["/api/translate-video", "/api/video/translate", "/api/jobs/video", "/a
       fs.promises.unlink(file.path).catch(() => {});
       return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងបកប្រែវីដេអូមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
     }
-        const voice = String(req.body?.voice || req.body?.gender || "auto").trim();
+    const voice = String(req.body?.voice || req.body?.gender || "auto").trim();
     const job = createJob(jobs, file.path, file.originalname, voice);
     processVideoJob(job).catch(() => {});
     res.status(202).json({
-      
       ok: true,
       success: true,
       status: job.status,
@@ -874,12 +746,12 @@ app.post(["/api/translate-series", "/api/batch-video", "/api/merge-episodes", "/
     }
     if (activeMediaJobId) {
       for (const f of files) fs.promises.unlink(f.path).catch(() => {});
-      return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងដំណើរការការងារផ្សេង សូមរង់ចាំបន្តិច" });
+      return res.status(409).json({ ok: false, success: false, error: "ប្រព័ន្ធកំពុងដំណើរការការងារមួយផ្សេងទៀត សូមរង់ចាំបន្តិច" });
     }
-    const voice = String(req.body?.voice || "auto").trim();
-    const job = createJob(jobs, files[0].path, `${files.length} episodes`, voice);
+    const voice = String(req.body?.voice || req.body?.gender || "auto").trim();
+    const job = createJob(jobs, files[0].path, `${files.length} ភាគ`, voice);
     processSeriesJob(job, files).catch(() => {});
-    res.json({
+    res.status(202).json({
       ok: true,
       success: true,
       status: job.status,
@@ -897,142 +769,104 @@ app.post(["/api/translate-series", "/api/batch-video", "/api/merge-episodes", "/
   }
 });
 
-app.get(["/api/jobs/:id", "/api/video/status/:id", "/api/status/:id", "/api/video/jobs/:id"], (req, res) => {
+app.get(["/api/jobs/:id", "/api/video/jobs/:id", "/api/status/:id", "/api/video/status/:id", "/api/tasks/:id"], (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) return res.status(404).json({ ok: false, success: false, error: "រកមិនឃើញទិន្នន័យការងារនេះទេ" });
-  const downloadUrl = job.output ? `/api/video/jobs/${job.id}/download` : null;
+  if (!job) {
+    return res.status(404).json({ ok: false, success: false, error: "រកមិនឃើញលេខកូដការងារនេះទេ (Server អាចទើបតែចាប់ផ្តើមឡើងវិញ)" });
+  }
+  const videoUrl = job.output ? `/api/jobs/${job.id}/video` : null;
+  const srtUrl = job.segments.length ? `/api/jobs/${job.id}/srt` : null;
   res.json({
     ok: true,
     success: true,
-    ...job,
+    id: job.id,
     jobId: job.id,
-    job_id: job.id,
-    downloadUrl,
-    download_url: downloadUrl,
-    videoUrl: downloadUrl,
-    video_url: downloadUrl,
-    resultUrl: downloadUrl,
-    outputUrl: downloadUrl,
-    url: downloadUrl,
-    data: { ...job, downloadUrl, videoUrl: downloadUrl }
+    status: job.status,
+    done: job.status === "completed",
+    progress: job.progress,
+    message: job.message,
+    videoUrl,
+    downloadUrl: videoUrl,
+    outputUrl: videoUrl,
+    url: videoUrl,
+    srtUrl,
+    videoTitle: job.videoTitle,
+    segments: job.segments,
+    subtitles: job.segments,
+    error: job.error,
+    data: {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      message: job.message,
+      videoUrl,
+      downloadUrl: videoUrl,
+      srtUrl,
+      videoTitle: job.videoTitle,
+      segments: job.segments,
+      error: job.error
+    }
   });
 });
 
-app.get(["/api/jobs/:id/download", "/api/video/download/:id", "/api/download/:id", "/api/video/jobs/:id/download"], (req, res) => {
+app.get(["/api/jobs/:id/video", "/api/jobs/:id/download", "/api/video/download/:id", "/api/download/:id"], (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job || !job.output || !fs.existsSync(job.output)) {
-    return res.status(404).json({ ok: false, success: false, error: "ឯកសារវីដេអូមិនទាន់រួចរាល់ ឬត្រូវបានលុបហើយ" });
+    return res.status(404).json({ ok: false, error: "រកមិនឃើញឯកសារវីដេអូ MP4 ទេ" });
   }
-  const baseName = path.parse(job.originalName || "video").name.replace(/[^\w\u1780-\u17FF-]+/g, "_");
-  res.download(job.output, `${baseName}_Khmer.mp4`);
+  res.sendFile(job.output);
 });
 
-app.get(["/api/jobs", "/api/video/jobs"], (req, res) => {
-  const list = [...jobs.values()]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 20)
-    .map((j) => ({
-      id: j.id,
-      status: j.status,
-      progress: j.progress,
-      message: j.message,
-      originalName: j.originalName,
-      videoTitle: j.videoTitle,
-      createdAt: j.createdAt,
-      downloadUrl: j.output ? `/api/video/jobs/${j.id}/download` : null
-    }));
-  res.json({ ok: true, success: true, jobs: list });
+app.get(["/api/jobs/:id/srt", "/api/video/srt/:id"], (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job || !job.segments.length) {
+    return res.status(404).json({ ok: false, error: "មិនមានអត្ថបទអក្សររត់ SRT ទេ" });
+  }
+  const srtLines = job.segments.map((seg, i) => {
+    return `${i + 1}\n${formatSrtTime(seg.start)} --> ${formatSrtTime(seg.end)}\n${seg.text}\n`;
+  });
+  res.setHeader("Content-Type", "application/x-subrip; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="khmer-${job.id}.srt"`);
+  res.send("\uFEFF" + srtLines.join("\n"));
 });
 
-
-app.post(["/api/translate-text", "/api/translate"], async (req, res) => {
+app.post(["/api/translate-text", "/api/text/translate", "/api/translate"], async (req, res) => {
   try {
-    const text = String(req.body?.text || "").trim();
-    if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទជាមុនសិន" });
-    if (!API_KEY) return res.status(500).json({ ok: false, error: "មិនទាន់បានកំណត់ GEMINI_API_KEY ទេ" });
-    const textUrl = "https:" + "//[generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/)" + encodeURIComponent(GEMINI_TEXT_MODEL) + ":generateContent";
-    const r = await geminiFetchWithRetry(
-      textUrl,
-      {
-        method: "POST",
-        headers: { "x-goog-api-key": API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            { parts: [{ text: `Translate the following text into natural, fluent Khmer. Output ONLY the Khmer translation without notes:\n\n${text}` }] }
-          ]
-        })
-      },
-      2,
-      30000
-    );
-    const data = await r.json();
-    const translatedText = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() || "";
-    res.json({ ok: true, translatedText, text: translatedText });
+    const text = String(req.body?.text || req.body?.content || req.body?.prompt || "").trim();
+    if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទដែលត្រូវបកប្រែ" });
+    const style = String(req.body?.style || "natural").trim();
+    const translation = await translateTextWithFallback(text, style);
+    res.json({ ok: true, success: true, translation, translatedText: translatedTextWithFallback ? translation : translation, result: translation });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 
 app.post(["/api/tts", "/api/speak"], async (req, res) => {
-  const tempMp3 = path.join(TMP, `tts-${randomUUID()}.mp3`);
   try {
     const text = String(req.body?.text || "").trim();
-    const voice = String(req.body?.voice || "female").trim();
-    if (!text) return res.status(400).json({ ok: false, error: "សូមបញ្ចូលអត្ថបទសម្រាប់អានសំឡេង" });
-    await createKhmerSpeech(text, tempMp3, voice);
-    res.setHeader("Content-Type", "audio/mpeg");
-    const stream = fs.createReadStream(tempMp3);
-    stream.pipe(res);
-    stream.on("close", () => fs.promises.unlink(tempMp3).catch(() => {}));
+    if (!text) return res.status(400).json({ ok: false, error: "គ្មានអត្ថបទសម្រាប់អាន" });
+    const gender = String(req.body?.voice || req.body?.gender || "female").trim();
+    const outMp3 = path.join(TMP, `tts-${randomUUID()}.mp3`);
+    await createKhmerSpeech(text, outMp3, gender === "male" ? "male" : "female");
+    res.sendFile(outMp3, () => {
+      fs.promises.unlink(outMp3).catch(() => {});
+    });
   } catch (err) {
-    fs.promises.unlink(tempMp3).catch(() => {});
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-app.post(["/api/login", "/api/auth/login", "/login"], (req, res) => {
-  const username = String(req.body?.username || req.body?.user || "").trim();
-  const password = String(req.body?.password || req.body?.pass || "").trim();
-  const expectedUser = (process.env.ADMIN_USERNAME || process.env.APP_USERNAME || "khmeradmin").trim();
-  const expectedPass = (process.env.ADMIN_PASSWORD || process.env.APP_PASSWORD || "").trim();
-  if (!username || !password) {
-    return res.status(400).json({ ok: false, success: false, error: "សូមបញ្ចូលឈ្មោះអ្នកប្រើ និងពាក្យសម្ងាត់" });
-  }
-  const isValid = expectedPass
-    ? (username === expectedUser && password === expectedPass)
-    : (username === expectedUser && password.length > 0);
-  if (!isValid) {
-    return res.status(401).json({ ok: false, success: false, error: "ឈ្មោះអ្នកប្រើ ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ" });
-  }
-  const token = Buffer.from(`${username}:${Date.now()}`).toString("base64");
-  res.json({ ok: true, success: true, token, username, user: { username, role: "admin" } });
-});
-
-app.get(["/api/me", "/api/auth/me", "/api/session", "/api/check-auth"], (req, res) => {
-  const username = (process.env.ADMIN_USERNAME || process.env.APP_USERNAME || "khmeradmin").trim();
-  res.json({ ok: true, authenticated: true, username, user: { username, role: "admin" } });
-});
-
-app.post(["/api/logout", "/api/auth/logout"], (req, res) => {
-  res.json({ ok: true, success: true });
-});
-
-app.all("/api/*", (req, res) => {
-  res.status(404).json({ ok: false, error: `រកមិនឃើញមុខងារ API នេះទេ (${req.path})` });
-});
-
 app.get("*", (req, res) => {
-  const indexPublic = path.join(publicDir, "index.html");
-  if (fs.existsSync(indexPublic)) return res.sendFile(indexPublic);
-  const indexRoot = path.join(__dirname, "index.html");
-  if (fs.existsSync(indexRoot)) return res.sendFile(indexRoot);
-  res.status(404).send("Khmer AI Translator Pro API is running.");
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({ ok: false, error: "រកមិនឃើញតំណភ្ជាប់ API នេះទេ" });
+  }
+  const indexFile = path.join(publicDir, "index.html");
+  if (fs.existsSync(indexFile)) {
+    return res.sendFile(indexFile);
+  }
+  res.send("Khmer AI Translator Pro Server is running.");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("================================");
-  console.log("Khmer AI Translator Pro");
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Gemini configured: ${Boolean(API_KEY)}`);
-  console.log("================================");
-});
+  console.log("===============================
