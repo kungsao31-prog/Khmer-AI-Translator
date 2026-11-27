@@ -298,7 +298,7 @@ async function analyzeVideoWithFallback(videoPath, originalName, onProgress) {
   }
 }
 
-asasync function synthesizeWithGoogleFallback(text, outPath) {
+async function synthesizeWithGoogleFallback(text, outPath) {
   const clean = String(text || "").trim();
   const chunks = [];
   for (let i = 0; i < clean.length; i += 180) {
