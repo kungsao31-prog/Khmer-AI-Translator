@@ -417,22 +417,137 @@ async function createAssSubtitle(segments, videoTitle, assPath) {
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
-    "PlayResX: 720",
-    "PlayResY: 1280",
-    "ScaledBorderAndShadow: yes",
-    "",
-    "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Default,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
-    "Style: Subtitle,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
-    "Style: Title,Noto Sans Khmer,38,&H0000E5FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2.5,1,8,36,36,92,1",
-    "",
-    "[Events]",
-    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
-  ];
+    function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      reject(new Error("FFmpeg ដំណើរការលើសពេលកំណត់"));
+    }, timeoutMs);
 
-  const events = [];
-  const cleanTitle = String(videoTitle || "").trim();
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+      if (stderr.length > 6000) stderr = stderr.slice(-4000);
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(new Error(`មិនអាចបើក FFmpeg បានទេ៖ ${err.message}`));
+    });
+
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) return resolve();
+      const tail = stderr.trim().slice(-1200);
+      reject(new Error(`FFmpeg បរាជ័យ៖ ${tail}`));
+    });
+  });
+}
+
+async function createDubbedVideo(options) {
+  const { inputPath, outputPath, segments, videoTitle = "", voice = "auto", workDir, duration, onProgress } = options;
+  if (!Array.isArray(segments) || !segments.length) throw new Error("មិនមានប្រយោគសម្រាប់បង្កើតសំឡេងទេ");
+  await fs.promises.mkdir(workDir, { recursive: true });
+  const audioFiles = [];
+  const assPath = path.join(workDir, "subtitles.ass");
+  const mixedAudioPath = path.join(workDir, "mixed-voice.m4a");
+
+  try {
+    if (onProgress) onProgress(50, "កំពុងបង្កើតសំឡេងខ្មែរតួប្រុស និងតួស្រី...");
+    await runWithConcurrency(segments, TTS_CONCURRENCY, async (segment, index) => {
+      const audioPath = path.join(workDir, `speech-${String(index).padStart(5, "0")}.mp3`);
+      const segmentVoice = voice === "male"
+        ? "male"
+        : voice === "female_only"
+          ? "female"
+          : (segment.speaker === "male" ? "male" : "female");
+      await createKhmerSpeech(segment.text, audioPath, segmentVoice);
+      audioFiles[index] = audioPath;
+    });
+
+    if (onProgress) onProgress(65, "កំពុងរៀបចំបញ្ចូលសំឡេងខ្មែរ...");
+    const audioArgs = ["-y"];
+    for (const audioPath of audioFiles) audioArgs.push("-i", audioPath);
+
+    const audioFilters = [];
+    if (segments.length === 1) {
+      const delay = Math.max(0, Math.round(segments[0].start * 1000));
+      audioFilters.push(`[0:a]adelay=${delay}:all=1,aresample=44100,alimiter=limit=0.95,apad[mixed]`);
+    } else {
+      const mixInputs = [];
+      for (let i = 0; i < segments.length; i++) {
+        const delay = Math.max(0, Math.round(segments[i].start * 1000));
+        audioFilters.push(`[${i}:a]adelay=${delay}:all=1,aresample=44100[voice${i}]`);
+        mixInputs.push(`[voice${i}]`);
+      }
+      audioFilters.push(`${mixInputs.join("")}amix=inputs=${segments.length}:duration=longest:dropout_transition=0:normalize=0,aresample=44100,alimiter=limit=0.95,apad[mixed]`);
+    }
+
+    audioArgs.push(
+      "-filter_complex", audioFilters.join(";"),
+      "-map", "[mixed]",
+      "-c:a", "aac",
+      "-b:a", "128k"
+    );
+    if (Number.isFinite(duration) && duration > 0) audioArgs.push("-t", String(duration));
+    audioArgs.push(mixedAudioPath);
+
+    await runFfmpeg(audioArgs, 15 * 60 * 1000);
+
+    if (onProgress) onProgress(78, "កំពុងបាំងអក្សរចាស់ ដាក់អក្សរខ្មែរ និងផលិតវីដេអូ...");
+    await createAssSubtitle(segments, videoTitle, assPath);
+    const escapedAss = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+    const hasTitle = Boolean(String(videoTitle || "").trim());
+
+    const filters = [
+      "[0:v]scale=w='if(gt(iw,ih),min(1280,iw),min(720,iw))':h='if(gt(iw,ih),min(720,ih),min(1280,ih))':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2[vscaled]"
+    ];
+    if (hasTitle) {
+      filters.push("[vscaled]split=3[base][topraw][botraw]");
+      filters.push("[topraw]crop=w=iw:h='trunc(ih*0.13/2)*2':x=0:y='trunc(ih*0.05/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.48:t=fill[topblur]");
+      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
+      filters.push("[base][topblur]overlay=x=0:y='trunc(H*0.05/2)*2'[v1]");
+      filters.push("[v1][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
+    } else {
+      filters.push("[vscaled]split=2[base][botraw]");
+      filters.push("[botraw]crop=w=iw:h='trunc(ih*0.14/2)*2':x=0:y='trunc(ih*0.78/2)*2',boxblur=3:1,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.52:t=fill[botblur]");
+      filters.push("[base][botblur]overlay=x=0:y='trunc(H*0.78/2)*2'[vmasked]");
+    }
+
+    filters.push(`[vmasked]ass='${escapedAss}'[vout]`);
+
+    const videoArgs = [
+      "-y",
+      "-i", inputPath,
+      "-i", mixedAudioPath,
+      "-filter_complex", filters.join(";"),
+      "-map", "[vout]",
+      "-map", "1:a:0",
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-tune", "zerolatency",
+      "-crf", "25",
+      "-pix_fmt", "yuv420p",
+      "-threads", "1",
+      "-c:a", "copy",
+      "-shortest",
+      "-movflags", "+faststart"
+    ];
+    if (Number.isFinite(duration) && duration > 0) videoArgs.push("-t", String(duration));
+    videoArgs.push(outputPath);
+
+    await runFfmpeg(videoArgs, 60 * 60 * 1000);
+    const outStat = await fs.promises.stat(outputPath);
+    if (!outStat.size) throw new Error("វីដេអូ MP4 ដែលបានបង្កើតមានទំហំសូន្យ");
+    return { outputPath, size: outStat.size, duration: duration || null, segments: segments.length };
+  } finally {
+    await fs.promises.unlink(assPath).catch(() => {});
+    await fs.promises.unlink(mixedAudioPath).catch(() => {});
+    for (const f of audioFiles) if (f) await fs.promises.unlink(f).catch(() => {});
+  }
+}
+
   if (cleanTitle) {
     events.push(`Dialogue: 1,0:00:00.00,${formatAssTime(maxEnd)},Title,,0,0,0,,${escapeAssText(wrapKhmerText(cleanTitle, 28))}`);
   }
