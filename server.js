@@ -958,7 +958,70 @@ app.post(["/api/tts", "/api/speak"], async (req, res) => {
   }
 });
 
-app.get("*", (req, res) => {
+app.get("/api/*", (req, res) => {
+  console.log(`[API GET] ${req.originalUrl}`);
+  const uuidMatch = req.originalUrl.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (uuidMatch) {
+    const targetId = uuidMatch[0].toLowerCase();
+    let job = jobs.get(targetId);
+    if (!job) {
+      for (const [k, v] of jobs.entries()) {
+        if (k.toLowerCase() === targetId) { job = v; break; }
+      }
+    }
+    if (!job) {
+      return res.json({
+        ok: false, success: false, id: targetId, status: "failed", done: true, progress: 0,
+        error: "Server បានចាប់ផ្តើមឡើងវិញ សូមចុចបកប្រែម្តងទៀត",
+        message: "Server បានចាប់ផ្តើមឡើងវិញ សូមចុចបកប្រែម្តងទៀត"
+      });
+    }
+    const lowerPath = req.path.toLowerCase();
+    if (lowerPath.endsWith("/video") || lowerPath.endsWith("/download") || lowerPath.endsWith("/mp4")) {
+      if (!job.output || !fs.existsSync(job.output)) {
+        return res.status(404).json({ ok: false, error: "រកមិនឃើញឯកសារវីដេអូ MP4 ទេ" });
+      }
+      return res.sendFile(job.output);
+    }
+    if (lowerPath.endsWith("/srt") || lowerPath.endsWith("/subtitle") || lowerPath.endsWith("/subtitles")) {
+      if (!job.segments.length) {
+        return res.status(404).json({ ok: false, error: "មិនមានអត្ថបទអក្សររត់ SRT ទេ" });
+      }
+      const srtLines = job.segments.map((seg, i) => `${i + 1}\n${formatSrtTime(seg.start)} --> ${formatSrtTime(seg.end)}\n${seg.text}\n`);
+      res.setHeader("Content-Type", "application/x-subrip; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="khmer-${job.id}.srt"`);
+      return res.send("\uFEFF" + srtLines.join("\n"));
+    }
+    const videoUrl = job.output ? `/api/jobs/${job.id}/video` : null;
+    const srtUrl = job.segments.length ? `/api/jobs/${job.id}/srt` : null;
+    return res.json({
+      ok: true, success: true, id: job.id, jobId: job.id, status: job.status,
+      done: job.status === "completed" || job.status === "failed",
+      progress: job.progress, message: job.message,
+      videoUrl, downloadUrl: videoUrl, outputUrl: videoUrl, url: videoUrl, srtUrl,
+      videoTitle: job.videoTitle, segments: job.segments, subtitles: job.segments, error: job.error,
+      data: {
+        id: job.id, status: job.status, progress: job.progress, message: job.message,
+        videoUrl, downloadUrl: videoUrl, srtUrl, videoTitle: job.videoTitle, segments: job.segments, error: job.error
+      }
+    });
+  }
+
+  const lower = req.path.toLowerCase();
+  if (lower.includes("health") || lower.includes("ffmpeg") || lower.includes("status") || lower.includes("config") || lower.includes("info")) {
+    return res.json({
+      ok: true, success: true, status: "ok",
+      ffmpeg: true, ffmpegReady: true, ffmpegAvailable: true,
+      geminiConfigured: Boolean(API_KEY),
+      models: { video: GEMINI_VIDEO_MODEL, text: GEMINI_TEXT_MODEL }
+    });
+  }
+  if (lower.includes("job") || lower.includes("history") || lower.includes("list")) {
+    return res.json({ ok: true, success: true, jobs: Array.from(jobs.values()).reverse() });
+  }
+  return res.status(404).json({ ok: false, error: `រកមិនឃើញតំណភ្ជាប់ API (${req.path})` });
+});
+        okp.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ ok: false, error: "រកមិនឃើញតំណភ្ជាប់ API នេះទេ" });
   }
