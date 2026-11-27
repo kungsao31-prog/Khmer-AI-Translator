@@ -319,40 +319,62 @@ async function synthesizeWithGoogleFallback(text, outPath) {
   await fs.promises.writeFile(outPath, Buffer.concat(buffers));
 }
 
+let edgeTtsCooldownUntil = 0;
+
+function runWithTimeout(promise, ms, label = "timeout") {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label)), ms);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function createKhmerSpeech(text, outPath, voiceGender = "female") {
   const voiceName = voiceGender === "male" ? "km-KH-PisethNeural" : "km-KH-SreymomNeural";
   const cleanText = String(text || "").trim();
   if (!cleanText) throw new Error("គ្មានអត្ថបទសម្រាប់បង្កើតសំឡេងទេ");
 
-  try {
-    const { EdgeTTS } = require("node-edge-tts");
-    const tts = new EdgeTTS({
-      voice: voiceName,
-      lang: "km-KH",
-      outputFormat: "audio-24khz-48kbitrate-mono-mp3",
-      rate: "+4%",
-      timeout: 20000
-    });
-    await tts.ttsPromise(cleanText, outPath);
-    const st = await fs.promises.stat(outPath);
-    if (st.size > 100) return;
-  } catch (_) {}
+  if (Date.now() > edgeTtsCooldownUntil) {
+    try {
+      const { EdgeTTS } = require("node-edge-tts");
+      const tts = new EdgeTTS({
+        voice: voiceName,
+        lang: "km-KH",
+        outputFormat: "audio-24khz-48kbitrate-mono-mp3",
+        rate: "+4%",
+        timeout: 8000
+      });
+      await runWithTimeout(tts.ttsPromise(cleanText, outPath), 9000, "EdgeTTS timeout");
+      const st = await fs.promises.stat(outPath);
+      if (st.size > 100) return;
+    } catch (_) {}
 
-  try {
-    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(cleanText);
-    await new Promise((resolve, reject) => {
-      const ws = fs.createWriteStream(outPath);
-      audioStream.pipe(ws);
-      ws.on("finish", resolve);
-      ws.on("error", reject);
-      audioStream.on("error", reject);
-    });
-    const st = await fs.promises.stat(outPath);
-    if (st.size > 100) return;
-  } catch (_) {}
+    try {
+      const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+      const tts = new MsEdgeTTS();
+      await runWithTimeout(
+        (async () => {
+          await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+          const { audioStream } = tts.toStream(cleanText);
+          await new Promise((resolve, reject) => {
+            const ws = fs.createWriteStream(outPath);
+            audioStream.pipe(ws);
+            ws.on("finish", resolve);
+            ws.on("error", reject);
+            audioStream.on("error", reject);
+          });
+        })(),
+        9000,
+        "MsEdgeTTS timeout"
+      );
+      const st = await fs.promises.stat(outPath);
+      if (st.size > 100) return;
+    } catch (_) {
+      edgeTtsCooldownUntil = Date.now() + 5 * 60 * 1000;
+    }
+  }
 
   await synthesizeWithGoogleFallback(cleanText, outPath);
 }
