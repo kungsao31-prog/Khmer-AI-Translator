@@ -411,13 +411,46 @@ function wrapKhmerText(text, maxChars = 34) {
   }
   return `${clean.slice(0, mid)}\\N${clean.slice(mid)}`;
 }
-
 async function createAssSubtitle(segments, videoTitle, assPath) {
   const maxEnd = segments.reduce((m, s) => Math.max(m, Number(s.end) || 0), 5) + 1.5;
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
-    function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
+    "PlayResX: 720",
+    "PlayResY: 1280",
+    "ScaledBorderAndShadow: yes",
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+    "Style: Default,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
+    "Style: Subtitle,Noto Sans Khmer,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,36,36,135,1",
+    "Style: Title,Noto Sans Khmer,38,&H0000E5FF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2.5,1,8,36,36,92,1",
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+  ];
+
+  const events = [];
+  const cleanTitle = String(videoTitle || "").trim();
+  if (cleanTitle) {
+    events.push(`Dialogue: 1,0:00:00.00,${formatAssTime(maxEnd)},Title,,0,0,0,,${escapeAssText(wrapKhmerText(cleanTitle, 28))}`);
+  }
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const nextStart = i + 1 < segments.length ? segments[i + 1].start : seg.end + 0.5;
+    const start = Math.max(0, Number(seg.start) || 0);
+    const end = Math.max(start + 0.5, Math.min(Number(seg.end) || start + 2, Math.max(start + 0.5, nextStart - 0.05)));
+    const line = escapeAssText(wrapKhmerText(seg.text, 34));
+    events.push(`Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Subtitle,,0,0,0,,${line}`);
+  }
+
+  const content = "\uFEFF" + [...header, ...events].join("\n") + "\n";
+  await fs.promises.writeFile(assPath, content, "utf8");
+}
+
+function runFfmpeg(args, timeoutMs = 60 * 60 * 1000) {
+    
   return new Promise((resolve, reject) => {
     const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
