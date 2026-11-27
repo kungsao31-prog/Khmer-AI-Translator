@@ -889,13 +889,25 @@ app.post(["/api/tts", "/api/speak"], async (req, res) => {
   }
 });
 
-app.get("*", (req, res) => {
+ app.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ ok: false, error: "រកមិនឃើញតំណភ្ជាប់ API នេះទេ" });
   }
-  const indexFile = path.join(publicDir, "index.html");
-  if (fs.existsSync(indexFile)) {
-    return res.sendFile(indexFile);
+  const safePath = path.normalize(req.path).replace(/^(\.\.[\/\\])+/, "");
+  const blocked = ["/server.js", "/package.json", "/package-lock.json", "/dockerfile", "/.env"];
+  if (safePath !== "/" && !blocked.includes(safePath.toLowerCase())) {
+    const rootAsset = path.join(__dirname, safePath);
+    if (rootAsset.startsWith(__dirname + path.sep) && fs.existsSync(rootAsset) && fs.statSync(rootAsset).isFile()) {
+      return res.sendFile(rootAsset);
+    }
+  }
+  const publicIndex = path.join(publicDir, "index.html");
+  if (fs.existsSync(publicIndex)) {
+    return res.sendFile(publicIndex);
+  }
+  const rootIndex = path.join(__dirname, "index.html");
+  if (fs.existsSync(rootIndex)) {
+    return res.sendFile(rootIndex);
   }
   res.send("Khmer AI Translator Pro Server is running.");
 });
@@ -907,4 +919,4 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Gemini configured: ${Boolean(API_KEY)}`);
   console.log("================================");
 });
-      
+                                            
