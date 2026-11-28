@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>កាត់វីដេអូ 9:16 ពេញ • ព្រិលអក្សរចិនអូតូ • អក្សរខ្មែរជំនួយ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Hanuman:wght@400;700&family=Kantumruy+Pro:wght@400;600;700&family=Koulen&family=Moul&family=Noto+Sans+Khmer:wght@400;600;700&family=Siemreap&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: #131c31;
+      --card-2: #1a2540;
+      --border: #283655;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-dark: #0284c7;
+      --accent: #a855f7;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      margin: 0;
+      padding: 0 0 88px 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Kantumruy Pro', 'Noto Sans Khmer', 'Battambang', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(11, 17, 32, 0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .brand p {
+      margin: 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 10px 12px;
+    }
+    .preview-wrapper {
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+    }
+    .stage-outer {
+      background: #02040a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    .canvas-stage {
+      position: relative;
+      width: 100%;
+      max-width: 340px;
+      aspect-ratio: 9 / 16;
+      background: #02040a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .canvas-stage.landscape {
+      max-width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+    canvas#editorCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .auto-detect-chip {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(11, 17, 32, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+    .empty-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      background: radial-gradient(circle at center, #16223d 0%, #070b14 100%);
+      cursor: pointer;
+    }
+    .empty-stage .big-btn {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 700;
+      box-shadow: 0 6px 18px rgba(56, 189, 248, 0.35);
+      margin-bottom: 8px;
+    }
+    .player-controls {
+      padding: 8px 12px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .timeline-row input[type="range"] {
+      flex: 1;
+    }
+    .time-badge {
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary);
+      font-weight: 600;
+      min-width: 44px;
+      text-align: center;
+    }
+    .btn-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button, .file-label {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      color: var(--text);
+      padding: 8px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    button:active, .file-label:active {
+      transform: scale(0.97);
+    }
+    button.primary, .file-label.primary {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      border-color: transparent;
+      color: #fff;
+    }
+    button.accent {
+      background: linear-gradient(135deg, #7e22ce, var(--accent));
+      border-color: transparent;
+      color: #fff;
+    }
+    button.success {
+      background: linear-gradient(135deg, #15803d, var(--success));
+      border-color: transparent;
+      color: #fff;
+    }
+    button.small {
+      padding: 5px 9px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .auto-sub-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.14));
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .title-box {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      margin-bottom: 8px;
+    }
+    .title-box-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--primary);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .title-input {
+      width: 100%;
+      background: rgba(11, 17, 32, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 7px 9px;
+    }
+    .title-variant-text {
+      font-size: 13px;
+      color: #f8fafc;
+      font-weight: 600;
+      margin: 2px 0;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    .field label span {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    select, input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card-2);
+      padding: 2px;
+      cursor: pointer;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+    }
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      display: inline-block;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #334155;
+      border-radius: 24px;
+      transition: 0.2s;
+      cursor: pointer;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .switch input:checked + .slider {
+      background: var(--primary);
+    }
+    .switch input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.97);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      padding: 6px 4px;
+    }
+    .nav-btn {
+      background: transparent;
+      border: none;
+      border-radius: 10px;
+      color: var(--muted);
+      padding: 5px 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .nav-btn span.ico {
+      font-size: 17px;
+    }
+    .nav-btn.active {
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .srt-item {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .srt-item.current {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+    .srt-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+    .progress-bar-wrap {
+      width: 100%;
+      height: 10px;
+      background: #0f172a;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin: 6px 0;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--accent), var(--success));
+      transition: width 0.2s;
+    }
+    .toast {
+      position: fixed;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      border: 1px solid var(--primary);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      z-index: 99;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      display: none;
+    }
+    .pill-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    .hint {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin: 4px 0 0 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🎬</div>
+      <div>
+        <h1>កាត់វីដេអូ 9:16 ពេញ Pro</h1>
+        <p>ព្រិលអូតូតាមតួអក្សរចិន • អក្សរខ្មែរជំនួយ • ចំណងជើងជ្រុងលើ</p>
+      </div>
+    </div>
+    <label class="file-label primary small" for="videoInput">📂 ដាក់វីដេអូ</label>
+    <input type="file" id="videoInput" accept="video/*" hidden />
+  </header>
+
+  <div id="toast" class="toast"></div>
+
+  <div class="container">
+    <!-- Full 9:16 Video Preview Canvas -->
+    <div class="preview-wrapper">
+      <div class="stage-outer">
+        <div class="canvas-stage" id="canvasStage">
+          <canvas id="editorCanvas"></canvas>
+          <div class="auto-detect-chip" id="autoDetectChip" style="display:none;">🔍 ចាប់តួអក្សរចិនព្រិលអូតូ</div>
+          <div class="empty-stage" id="emptyStage" onclick="document.getElementById('videoInput').click()">
+            <button type="button" class="big-btn">🎬 ជ្រើសរើសវីដេអូចូល (9:16 ពេញ)</button>
+            <p class="hint">ចាប់តួអក្សរចិនធ្វើឱ្យព្រិលអូតូតាមប្រវែងតួអក្សរ រួចដាក់អក្សរខ្មែរជំនួយ និងចំណងជើងនៅជ្រុងខាងលើ</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="player-controls">
+        <div class="timeline-row">
+          <span class="time-badge" id="curTimeLabel">00:00</span>
+          <input type="range" id="seekSlider" min="0" max="100" step="0.05" value="0" />
+          <span class="time-badge" id="durTimeLabel">00:00</span>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="playPauseBtn" class="primary small">▶️ ចាក់វីដេអូ</button>
+          <button type="button" id="stepBackBtn" class="small">⏪ -1s</button>
+          <button type="button" id="stepFwdBtn" class="small">⏩ +1s</button>
+          <button type="button" id="toggleRatioBtn" class="small">📱 ផ្ទៃ 9:16 ពេញ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUTOMATIC KHMER SUBTITLE STATUS & GENERATOR CARD -->
+    <div class="auto-sub-banner" id="autoSubBanner">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+        <strong style="font-size:13.5px; color:#fff;">🤖 អក្សរខ្មែររត់ជំនួយស្វ័យប្រវត្តិ</strong>
+        <span class="pill-badge" id="autoSubStatusBadge">រង់ចាំវីដេអូ</span>
+      </div>
+      <div id="autoSubProgressWrap" style="display:none;">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="autoSubProgressBar"></div>
+        </div>
+        <p class="hint" id="autoSubProgressText" style="color:#e2e8f0;">កំពុងស្តាប់សំឡេង និងបកប្រែជាអក្សរខ្មែរ...</p>
+      </div>
+      <div id="quickKeyPrompt" style="display:none; margin-top:6px;">
+        <p class="hint" style="color:#fde68a; margin-bottom:6px;">
+          💡 បិទភ្ជាប់ <b>Gemini API Key</b> តែម្តង ដើម្បីឱ្យកម្មវិធីស្តាប់សំឡេងវីដេអូ ហើយដាក់អក្សរខ្មែររត់ជំនួយដោយស្វ័យប្រវត្តិ៖
+        </p>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="quickGeminiKeyInput" placeholder="បិទភ្ជាប់ AIzaSy... នៅទីនេះ" />
+          <button type="button" class="primary small" onclick="saveQuickGeminiKey()">រក្សាទុក & បង្កើតអក្សរ</button>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button type="button" class="small accent" onclick="autoGenerateKhmerSubtitles(true)">✨ បង្កើតអក្សរខ្មែរស្វ័យប្រវត្តិ</button>
+        <button type="button" class="small" onclick="fetchLatestSrtFromBackend()">☁️ ទាញពី Server</button>
+        <label class="file-label small" for="srtInputTop">📥 ដាក់ .SRT</label>
+        <input type="file" id="srtInputTop" accept=".srt,.txt" hidden />
+      </div>
+    </div>
+
+    <!-- Story Title in Upper Corner Inside Video -->
+    <div class="card" id="storyTitleCard">
+      <div class="card-title">
+        <span>✨ ចំណងជើងរឿងក្នុងវីដេអូ (ជ្រុងខាងលើ)</span>
+        <span class="pill-badge" id="titleStatusBadge">រង់ចាំវីដេអូ</span>
+      </div>
+
+      <div class="title-box">
+        <div class="title-box-header">
+          <span>📌 ចំណងជើងរឿងដែលបង្ហាញក្នុងវីដេអូ (អាចកែបាន)</span>
+          <button type="button" class="small" onclick="copyTextValue('mainStoryTitle')">📋 ចម្លង</button>
+        </div>
+        <input type="text" id="mainStoryTitle" class="title-input" placeholder="សរសេរ ឬរង់ចាំ AI បង្កើតចំណងជើងរឿង..." oninput="renderCanvas()" />
+      </div>
+
+      <div class="grid-2">
+        <div class="switch-row">
+          <span>🏷️ បង្ហាញក្នុងវីដេអូ</span>
+          <label class="switch">
+            <input type="checkbox" id="showTopTitleToggle" checked onchange="renderCanvas()" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <select id="topTitlePos" onchange="renderCanvas()">
+            <option value="top-left" selected>📍 ជ្រុងខាងលើឆ្វេង</option>
+            <option value="top-center">📍 កណ្តាលខាងលើ</option>
+            <option value="top-right">📍 ជ្រុងខាងលើស្តាំ</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="titleVariantsArea" style="display:none; margin-top:8px;">
+        <div class="title-box">
+          <div class="title-box-header">
+            <span>🎭 បែបមនោសញ្ចេតនា / រឿងភាគ</span>
+            <div>
+              <button type="button" class="small" onclick="useVariantTitle('dramaTitleText')">ប្រើក្នុងវីដេអូ</button>
+              <button type="button" class="small" onclick="copyElementText('dramaTitleText')">📋 ចម្លង</button>
+            </div>
+          </div>
+          <div id="dramaTitleText" class="title-variant-text"></div>
+        </div>
+
+        <div class="title-box">
+          <div class="title-box-header">
+            <span>🔥 បែបអាថ៌កំបាំង / ទាក់ទាញអ្នកមើល</span>
+            <div>
+              <button type="button" class="small" onclick="useVariantTitle('mysteryTitleText')">ប្រើក្នុងវីដេអូ</button>
+              <button type="button" class="small" onclick="copyElementText('mysteryTitleText')">📋 ចម្លង</button>
+            </div>
+          </div>
+          <div id="mysteryTitleText" class="title-variant-text"></div>
+        </div>
+
+        <div class="title-box">
+          <div class="title-box-header">
+            <span>⚡ ចំណងជើងខ្លីៗ (TikTok / Reels / Shorts)</span>
+            <div>
+              <button type="button" class="small" onclick="useVariantTitle('shortHookText')">ប្រើក្នុងវីដេអូ</button>
+              <button type="button" class="small" onclick="copyElementText('shortHookText')">📋 ចម្លង</button>
+            </div>
+          </div>
+          <div id="shortHookText" class="title-variant-text"></div>
+        </div>
+
+        <div class="title-box">
+          <div class="title-box-header">
+            <span>📝 សង្ខេបសាច់រឿងខ្លីៗ</span>
+            <button type="button" class="small" onclick="copyElementText('storySynopsisText')">📋 ចម្លង</button>
+          </div>
+          <div id="storySynopsisText" class="hint" style="color:#cbd5e1;"></div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:8px;">
+        <button type="button" class="small accent" onclick="analyzeVideoForStoryTitle(true)">🔄 វិភាគចំណងជើងម្តងទៀត</button>
+        <button type="button" class="small" onclick="toggleApiKeyBox()">🔑 កំណត់ Gemini API</button>
+      </div>
+
+      <div id="apiKeyBox" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+        <div class="field">
+          <label>Gemini API Key (សម្រាប់បកប្រែអក្សរខ្មែររត់ស្វ័យប្រវត្តិ និងវិភាគរឿង)</label>
+          <input type="text" id="geminiApiKeyInput" placeholder="បិទភ្ជាប់ AIzaSy... នៅទីនេះ" onchange="saveGeminiKey()" />
+        </div>
+        <div class="field">
+          <label>តំណភ្ជាប់ Server បកប្រែរបស់បង (Render Backend)</label>
+          <input type="text" id="backendUrlInput" value="https://khmer-ai-translator-rb2a.onrender.com" onchange="saveGeminiKey()" />
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: TRIM VIDEO & FULL 9:16 FIT -->
+    <div class="tab-panel" id="tab-trim">
+      <div class="card">
+        <div class="card-title">
+          <span>📐 ពង្រីកវីដេអូឱ្យពេញផ្ទៃ 9:16 & កាត់វីដេអូ</span>
+          <span class="pill-badge" id="trimDurationBadge">ប្រវែង៖ 00:00</span>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ពង្រីកវីដេអូ (Zoom) <span id="videoZoomVal">100%</span></label>
+            <input type="range" id="videoZoom" min="100" max="150" value="100" oninput="document.getElementById('videoZoomVal').textContent=this.value+'%'; renderCanvas();" />
+          </div>
+          <div class="field">
+            <label>រំកិលរូបលើ-ក្រោម <span id="videoPanYVal">0%</span></label>
+            <input type="range" id="videoPanY" min="-25" max="25" value="0" oninput="document.getElementById('videoPanYVal').textContent=this.value+'%'; renderCanvas();" />
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:10px;">💡 បើវីដេអូថតអេក្រង់ជាប់របារខ្មៅលើ-ក្រោម សូមទាញ «ពង្រីកវីដេអូ (Zoom)» ឡើង 115%–125% ដើម្បីឱ្យពេញផ្ទៃ 9:16 ស្អាត។</p>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ចាប់ផ្តើម (វិនាទី) <span id="trimStartVal">0.0s</span></label>
+            <input type="number" id="trimStartInput" min="0" step="0.1" value="0" onchange="updateTrimFromInputs()" />
+            <div class="btn-row">
+              <button type="button" class="small" onclick="nudgeTrim('start', -0.1)">-0.1s</button>
+              <button type="button" class="small" onclick="nudgeTrim('start', 0.1)">+0.1s</button>
+              <button type="button" class="small primary" onclick="setTrimFromCurrent('start')">យកម៉ោងនេះ</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>បញ្ចប់ (វិនាទី) <span id="trimEndVal">0.0s</span></label>
+            <input type="number" id="trimEndInput" min="0" step="0.1" value="0" onchange="updateTrimFromInputs()" />
+            <div class="btn-row">
+              <button type="button" class="small" onclick="nudgeTrim('end', -0.1)">-0.1s</button>
+              <button type="button" class="small" onclick="nudgeTrim('end', 0.1)">+0.1s</button>
+              <button type="button" class="small primary" onclick="setTrimFromCurrent('end')">យកម៉ោងនេះ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: AUTO DETECT CHINESE TEXT & DYNAMIC BLUR -->
+    <div class="tab-panel active" id="tab-cover">
+      <div class="card">
+        <div class="card-title">
+          <span>🔍 ចាប់អក្សរចិនព្រិលអូតូតាមតួអក្សរ</span>
+          <label class="switch">
+            <input type="checkbox" id="coverEnabled" checked onchange="renderCanvas()" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>របៀបធ្វើឱ្យព្រិលអក្សរចិន</label>
+            <select id="coverMode" onchange="renderCanvas()">
+              <option value="auto_blur" selected>ព្រិលអូតូតាមប្រវែងតួអក្សរចិន</option>
+              <option value="blur">ព្រិលប្រអប់ទំហំថេរ (Fixed Blur)</option>
+              <option value="solid">ពណ៌រាបបិទបាំង (Solid Box)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>កម្រិតភាពព្រិលកុំឱ្យច្បាស់ <span id="coverOpacityVal">98%</span></label>
+            <input type="range" id="coverOpacity" min="40" max="100" value="98" oninput="syncCoverLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>កម្ពស់ជួរអក្សរចិន (Y) <span id="coverYVal">70%</span></label>
+            <input type="range" id="coverY" min="10" max="95" value="70" oninput="syncCoverLabels(); syncTextWithCover(); renderCanvas();" />
+          </div>
+          <div class="field">
+            <label>ភាពរហ័សចាប់តួអក្សរ <span id="detectSensVal">80%</span></label>
+            <input type="range" id="detectSensitivity" min="25" max="100" value="80" oninput="document.getElementById('detectSensVal').textContent=this.value+'%'; renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ដែនទទឹងអតិបរមា <span id="coverWVal">86%</span></label>
+            <input type="range" id="coverW" min="20" max="100" value="86" oninput="syncCoverLabels(); renderCanvas();" />
+          </div>
+          <div class="field">
+            <label>កម្ពស់តួអក្សរ <span id="coverHVal">10%</span></label>
+            <input type="range" id="coverH" min="4" max="28" value="10" oninput="syncCoverLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div style="display:none;">
+          <input type="range" id="coverX" min="0" max="100" value="50" />
+          <input type="color" id="coverColor" value="#000000" />
+        </div>
+
+        <div class="switch-row">
+          <span>🔗 ឱ្យអក្សរខ្មែររត់ជំនួយចំពីលើកន្លែងព្រិល</span>
+          <label class="switch">
+            <input type="checkbox" id="linkTextToCover" checked onchange="syncTextWithCover(); renderCanvas();" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <p class="hint">✨ ប្រព័ន្ធនឹងចាប់តួអក្សរចិនដែលលោតមកលើអេក្រង់ដោយអូតូ វាស់ប្រវែងតួអក្សរនោះ ហើយធ្វើឱ្យព្រិលម៉ដ្ឋកុំឱ្យអានដាច់ រួចដាក់អក្សរខ្មែរជំនួយពីលើ។ បងអាចយកម្រាមដៃអូសឡើងចុះលើអេក្រង់វីដេអូដើម្បីតម្រង់កម្ពស់ជួរអក្សរចិន។</p>
+      </div>
+    </div>
+
+    <!-- TAB 3: KHMER SRT SUBTITLES -->
+    <div class="tab-panel" id="tab-srt">
+      <div class="card">
+        <div class="card-title">
+          <span>📝 អក្សររត់ភាសាខ្មែរជំនួយ (.SRT)</span>
+          <span class="pill-badge" id="srtCountBadge">0 ឃ្លា</span>
+        </div>
+
+        <div class="btn-row" style="margin-bottom:10px;">
+          <button type="button" class="primary" onclick="autoGenerateKhmerSubtitles(true)">🤖 បង្កើតស្វ័យប្រវត្តិ</button>
+          <label class="file-label" for="srtInput">📥 បញ្ចូល .SRT</label>
+          <input type="file" id="srtInput" accept=".srt,.txt" hidden />
+          <button type="button" class="accent" onclick="fetchLatestSrtFromBackend()">☁️ ទាញពី Server</button>
+          <button type="button" class="small" onclick="addNewSubtitleLine()">➕ បន្ថែមឃ្លា</button>
+        </div>
+
+        <div id="srtListContainer">
+          <p class="hint">ពេលបងដាក់វីដេអូចូល អក្សររត់ខ្មែរនឹងបង្ហាញនៅទីនេះដោយស្វ័យប្រវត្តិ ហើយបងអាចកែសម្រួលពាក្យនីមួយៗបាន។</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: TEXT STYLE, OUTLINE & DROP SHADOW -->
+    <div class="tab-panel" id="tab-style">
+      <div class="card">
+        <div class="card-title">
+          <span>🎨 ម៉ូដអក្សរ ស៊ុម និងស្រមោលតួអក្សរ</span>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ម៉ូដអក្សរខ្មែរ (Font)</label>
+            <select id="fontFamily" onchange="renderCanvas()">
+              <option value="'Kantumruy Pro', 'Noto Sans Khmer', sans-serif">Kantumruy Pro (ស្អាតទាន់សម័យ)</option>
+              <option value="'Battambang', 'Noto Sans Khmer', sans-serif">Battambang (ច្បាស់ងាយអាន)</option>
+              <option value="'Koulen', 'Noto Sans Khmer', sans-serif">Koulen (អក្សរធំចំណងជើង)</option>
+              <option value="'Moul', 'Noto Sans Khmer', serif">Moul (អក្សរមូលប្រពៃណី)</option>
+              <option value="'Hanuman', 'Noto Sans Khmer', serif">Hanuman (អក្សររឿងនិទាន)</option>
+              <option value="'Siemreap', 'Noto Sans Khmer', sans-serif">Siemreap (សាមញ្ញស្រទន់)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>ទំហំអក្សរ <span id="fontSizeVal">34px</span></label>
+            <input type="range" id="fontSize" min="16" max="72" value="34" oninput="syncStyleLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ពណ៌តួអក្សរ</label>
+            <input type="color" id="textColor" value="#ffffff" onchange="renderCanvas()" />
+          </div>
+          <div class="field">
+            <label>ទីតាំងអក្សរលើ-ក្រោម (Y) <span id="textYVal">70%</span></label>
+            <input type="range" id="textY" min="10" max="96" value="70" oninput="document.getElementById('linkTextToCover').checked=false; syncStyleLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="card-title" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+          <span>🖊️ ស៊ុមព័ទ្ធតួអក្សរ (Outline)</span>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>ពណ៌ស៊ុមអក្សរ</label>
+            <input type="color" id="strokeColor" value="#000000" onchange="renderCanvas()" />
+          </div>
+          <div class="field">
+            <label>កម្រាស់ស៊ុម <span id="strokeWidthVal">6px</span></label>
+            <input type="range" id="strokeWidth" min="0" max="14" value="6" oninput="syncStyleLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="card-title" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+          <span>🌑 ស្រមោលតួអក្សរ (Text Shadow)</span>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>ពណ៌ស្រមោល</label>
+            <input type="color" id="shadowColor" value="#000000" onchange="renderCanvas()" />
+          </div>
+          <div class="field">
+            <label>ភាពច្បាស់ស្រមោល <span id="shadowOpacityVal">95%</span></label>
+            <input type="range" id="shadowOpacity" min="0" max="100" value="95" oninput="syncStyleLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>ភាពព្រិលស្រមោល (Blur) <span id="shadowBlurVal">9px</span></label>
+            <input type="range" id="shadowBlur" min="0" max="25" value="9" oninput="syncStyleLabels(); renderCanvas();" />
+          </div>
+          <div class="field">
+            <label>គម្លាតស្រមោលចុះក្រោម (Y) <span id="shadowYVal">3px</span></label>
+            <input type="range" id="shadowY" min="-15" max="20" value="3" oninput="syncStyleLabels(); renderCanvas();" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>គម្លាតស្រមោលឆ្វេង-ស្តាំ (X) <span id="shadowXVal">2px</span></label>
+          <input type="range" id="shadowX" min="-15" max="20" value="2" oninput="syncStyleLabels(); renderCanvas();" />
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: EXPORT VIDEO -->
+    <div class="tab-panel" id="tab-export">
+      <div class="card">
+        <div class="card-title">
+          <span>🚀 ផលិត និងទាញយកវីដេអូសម្រេច (9:16 ពេញ)</span>
+        </div>
+        <p class="hint" style="margin-bottom:10px;">
+          ប្រព័ន្ធនឹងបញ្ចូលផ្ទៃវីដេអូ 9:16 ពេញ ការចាប់អក្សរចិនព្រិលអូតូតាមប្រវែងតួអក្សរ ចំណងជើងនៅជ្រុងខាងលើ និងអក្សរខ្មែររត់ជំនួយ រួមជាមួយសំឡេងចូលគ្នាជាឯកសារតែមួយ។
+        </p>
+
+        <button type="button" id="exportBtn" class="success" style="width:100%; padding:12px; font-size:15px;" onclick="startVideoExport()">
+          🎬 ចាប់ផ្តើមផលិត និងទាញយកវីដេអូ
+        </button>
+
+        <div id="exportProgressArea" style="display:none; margin-top:12px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; font-weight:600;">
+            <span id="exportStatusText">កំពុងដំណើរការ...</span>
+            <span id="exportPercentText">0%</span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="exportProgressBar"></div>
+          </div>
+          <p class="hint">⚠️ សូមរក្សាអេក្រង់ទូរស័ព្ទឱ្យភ្លឺរហូតដល់ភាគរយលោតដល់ 100%។</p>
+        </div>
+
+        <div id="exportDownloadArea" style="display:none; margin-top:12px;">
+          <a id="downloadFinalLink" class="file-label primary" style="width:100%; padding:12px; text-decoration:none; font-size:15px;">
+            ⬇️ ចុចទាញយកវីដេអូចូលទូរស័ព្ទ
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Video Element -->
+  <video id="sourceVideo" playsinline crossorigin="anonymous" style="display:none;"></video>
+
+  <!-- Bottom Mobile Navigation -->
+  <nav class="bottom-nav">
+    <button type="button" class="nav-btn" onclick="switchTab('trim', this)">
+      <span class="ico">📐</span>
+      <span>ផ្ទៃ 9:16</span>
+    </button>
+    <button type="button" class="nav-btn active" onclick="switchTab('cover', this)">
+      <span class="ico">🔍</span>
+      <span>ព្រិលអក្សរចិន</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="switchTab('srt', this)">
+      <span class="ico">📝</span>
+      <span>អក្សរខ្មែរ</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="switchTab('style', this)">
+      <span class="ico">🌑</span>
+      <span>ស្រមោលអក្សរ</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="switchTab('export', this)">
+      <span class="ico">📥</span>
+      <span>នាំចេញ</span>
+    </button>
+  </nav>
+
+  <script>
+    const video = document.getElementById("sourceVideo");
+    const canvas = document.getElementById("editorCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Offscreen canvases for heavy multi-pass smooth blur & character detection
+    const blurCanvas1 = document.createElement("canvas");
+    const blurCtx1 = blurCanvas1.getContext("2d");
+    const blurCanvas2 = document.createElement("canvas");
+    const blurCtx2 = blurCanvas2.getContext("2d");
+    const detectCanvas = document.createElement("canvas");
+    const detectCtx = detectCanvas.getContext("2d", { willReadFrequently: true });
+
+    const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"];
+
+    let subtitles = [];
+    let trimStart = 0;
+    let trimEnd = 0;
+    let isExporting = false;
+    let isGeneratingSubs = false;
+    let currentVideoFile = null;
+    let currentVideoName = "";
+    let draggingCover = false;
+    let dragOffsetY = 0;
+    let showGuideTimer = 0;
+    let animFrameId = null;
+    let fullPortraitMode = true; // Default 9:16 ពេញ
+
+    // Tracked dynamic Chinese text bounding box (matches exact character length)
+    let trackedBox = {
+      active: false,
+      alpha: 0,
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0
+    };
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    async function callGeminiWithFallback(apiKey, payload, onRetryStatus) {
+      let lastError = "Gemini API error";
+      const retryDelays = [0, 3000, 6000, 10000];
+      for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+        if (retryDelays[attempt] > 0) {
+          if (onRetryStatus) onRetryStatus(`⏳ Server Google កំពុងមមាញឹក កំពុងសាកល្បងម្តងទៀត (${attempt}/3)...`);
+          await sleep(retryDelays[attempt]);
+        }
+        for (const model of GEMINI_MODELS) {
+          try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            if (result.error) {
+              lastError = result.error.message || lastError;
+              if (/not found|no longer available|not supported|models\/|high demand|overloaded|unavailable|503|429/i.test(lastError)) {
+                continue;
+              }
+              throw new Error(lastError);
+            }
+            return result;
+          } catch (err) {
+            lastError = err.message || lastError;
+            if (!/not found|no longer available|not supported|models\/|high demand|overloaded|unavailable|503|429|fetch/i.test(lastError)) {
+              throw err;
+            }
+          }
+        }
+      }
+      throw new Error(lastError);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const savedKey = localStorage.getItem("khmer_editor_gemini_key") || "";
+      const savedBackend = localStorage.getItem("khmer_editor_backend_url") || "https://khmer-ai-translator-rb2a.onrender.com";
+      document.getElementById("geminiApiKeyInput").value = savedKey;
+      document.getElementById("quickGeminiKeyInput").value = savedKey;
+      document.getElementById("backendUrlInput").value = savedBackend;
+      if (!savedKey) {
+        document.getElementById("quickKeyPrompt").style.display = "block";
+      }
+      // Default full 9:16 vertical resolution
+      canvas.width = 720;
+      canvas.height = 1280;
+      renderCanvas();
+    });
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.display = "none"; }, 2800);
+    }
+
+    function saveGeminiKey() {
+      const key = document.getElementById("geminiApiKeyInput").value.trim();
+      localStorage.setItem("khmer_editor_gemini_key", key);
+      document.getElementById("quickGeminiKeyInput").value = key;
+      localStorage.setItem("khmer_editor_backend_url", document.getElementById("backendUrlInput").value.trim());
+      if (key) document.getElementById("quickKeyPrompt").style.display = "none";
+      showToast("✅ បានរក្សាទុកការកំណត់");
+    }
+
+    function saveQuickGeminiKey() {
+      const key = document.getElementById("quickGeminiKeyInput").value.trim();
+      if (!key) return showToast("⚠️ សូមបិទភ្ជាប់ Gemini API Key ជាមុនសិន");
+      localStorage.setItem("khmer_editor_gemini_key", key);
+      document.getElementById("geminiApiKeyInput").value = key;
+      document.getElementById("quickKeyPrompt").style.display = "none";
+      showToast("✅ បានរក្សាទុក Key! កំពុងបង្កើតអក្សរខ្មែររត់...");
+      if (video.src) {
+        autoGenerateKhmerSubtitles(true);
+      }
+    }
+
+    function toggleApiKeyBox() {
+      const box = document.getElementById("apiKeyBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    function switchTab(tabName, btn) {
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + tabName).classList.add("active");
+      btn.classList.add("active");
+    }
+
+    function formatTime(sec) {
+      if (!Number.isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    function syncTextWithCover() {
+      if (document.getElementById("linkTextToCover").checked) {
+        const cy = document.getElementById("coverY").value;
+        document.getElementById("textY").value = cy;
+        syncStyleLabels();
+      }
+    }
+
+    function applyCanvasAspect() {
+      const stage = document.getElementById("canvasStage");
+      const btn = document.getElementById("toggleRatioBtn");
+      if (fullPortraitMode) {
+        stage.classList.remove("landscape");
+        canvas.width = 720;
+        canvas.height = 1280;
+        btn.textContent = "📱 ផ្ទៃ 9:16 ពេញ";
+      } else {
+        stage.classList.add("landscape");
+        canvas.width = 1280;
+        canvas.height = 720;
+        btn.textContent = "🖥️ ផ្ទៃ 16:9";
+      }
+      renderCanvas();
+    }
+
+    document.getElementById("toggleRatioBtn").addEventListener("click", () => {
+      fullPortraitMode = !fullPortraitMode;
+      applyCanvasAspect();
+    });
+
+    // Video upload -> Full 9:16 + auto Chinese character blur + auto Khmer subtitles + auto story title in upper corner
+    document.getElementById("videoInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      currentVideoFile = file;
+      currentVideoName = file.name.replace(/\.[^/.]+$/, "");
+      subtitles = [];
+      trackedBox = { active: false, alpha: 0, x: 0, y: 0, w: 0, h: 0 };
+      renderSrtList();
+
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      document.getElementById("emptyStage").style.display = "none";
+      document.getElementById("autoDetectChip").style.display = "block";
+
+      video.onloadedmetadata = async () => {
+        fullPortraitMode = true;
+        applyCanvasAspect();
+
+        document.getElementById("coverY").value = 70;
+        document.getElementById("textY").value = 70;
+        document.getElementById("coverW").value = 86;
+        document.getElementById("coverH").value = 10;
+        syncCoverLabels();
+        syncStyleLabels();
+
+        trimStart = 0;
+        trimEnd = Number(video.duration.toFixed(1));
+        document.getElementById("trimStartInput").value = 0;
+        document.getElementById("trimEndInput").value = trimEnd;
+        document.getElementById("seekSlider").max = video.duration;
+        document.getElementById("durTimeLabel").textContent = formatTime(video.duration);
+        updateTrimLabels();
+
+        video.currentTime = Math.min(1.5, video.duration * 0.05);
+        showToast("🔍 កំពុងចាប់អក្សរចិនព្រិលអូតូ និងបង្កើតអក្សរខ្មែរជំនួយ...");
+
+        await analyzeVideoForStoryTitle(false);
+        await autoGenerateKhmerSubtitles(false);
+      };
+    });
+
+    video.addEventListener("seeked", () => {
+      document.getElementById("curTimeLabel").textContent = formatTime(video.currentTime);
+      document.getElementById("seekSlider").value = video.currentTime;
+      renderCanvas();
+      highlightActiveSrt();
+    });
+
+    video.addEventListener("timeupdate", () => {
+      if (!isExporting && video.currentTime >= trimEnd && !video.paused) {
+        video.pause();
+        video.currentTime = trimStart;
+        document.getElementById("playPauseBtn").textContent = "▶️ ចាក់វីដេអូ";
+      }
+      document.getElementById("curTimeLabel").textContent = formatTime(video.currentTime);
+      document.getElementById("seekSlider").value = video.currentTime;
+      highlightActiveSrt();
+    });
+
+    function startRenderLoop() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      const tick = () => {
+        renderCanvas();
+        if (!video.paused && !video.ended) {
+          animFrameId = requestAnimationFrame(tick);
+        }
+      };
+      animFrameId = requestAnimationFrame(tick);
+    }
+
+    document.getElementById("playPauseBtn").addEventListener("click", () => {
+      if (!video.src) return showToast("⚠️ សូមជ្រើសរើសវីដេអូជាមុនសិន");
+      if (video.paused) {
+        if (video.currentTime < trimStart || video.currentTime >= trimEnd) {
+          video.currentTime = trimStart;
+        }
+        video.play();
+        document.getElementById("playPauseBtn").textContent = "⏸️ ផ្អាក";
+        startRenderLoop();
+      } else {
+        video.pause();
+        document.getElementById("playPauseBtn").textContent = "▶️ ចាក់វីដេអូ";
+      }
+    });
+
+    document.getElementById("seekSlider").addEventListener("input", (e) => {
+      if (!video.src) return;
+      video.currentTime = Number(e.target.value);
+    });
+
+    document.getElementById("stepBackBtn").addEventListener("click", () => {
+      if (!video.src) return;
+      video.currentTime = Math.max(0, video.currentTime - 1);
+    });
+
+    document.getElementById("stepFwdBtn").addEventListener("click", () => {
+      if (!video.src) return;
+      video.currentTime = Math.min(video.duration, video.currentTime + 1);
+    });
+
+    // Trim functions
+    function updateTrimFromInputs() {
+      if (!video.src) return;
+      let s = Math.max(0, Number(document.getElementById("trimStartInput").value) || 0);
+      let e = Math.min(video.duration, Number(document.getElementById("trimEndInput").value) || video.duration);
+      if (e <= s) e = Math.min(video.duration, s + 0.5);
+      trimStart = Number(s.toFixed(1));
+      trimEnd = Number(e.toFixed(1));
+      document.getElementById("trimStartInput").value = trimStart;
+      document.getElementById("trimEndInput").value = trimEnd;
+      updateTrimLabels();
+    }
+
+    function nudgeTrim(which, delta) {
+      if (!video.src) return;
+      if (which === "start") {
+        trimStart = Math.max(0, Math.min(trimEnd - 0.2, Number((trimStart + delta).toFixed(1))));
+        document.getElementById("trimStartInput").value = trimStart;
+        video.currentTime = trimStart;
+      } else {
+        trimEnd = Math.min(video.duration, Math.max(trimStart + 0.2, Number((trimEnd + delta).toFixed(1))));
+        document.getElementById("trimEndInput").value = trimEnd;
+        video.currentTime = trimEnd;
+      }
+      updateTrimLabels();
+    }
+
+    function setTrimFromCurrent(which) {
+      if (!video.src) return;
+      const cur = Number(video.currentTime.toFixed(1));
+      if (which === "start") {
+        trimStart = Math.min(cur, trimEnd - 0.2);
+        document.getElementById("trimStartInput").value = trimStart;
+      } else {
+        trimEnd = Math.max(cur, trimStart + 0.2);
+        document.getElementById("trimEndInput").value = trimEnd;
+      }
+      updateTrimLabels();
+      showToast("✂️ បានកំណត់ចំណុចកាត់");
+    }
+
+    function updateTrimLabels() {
+      document.getElementById("trimStartVal").textContent = trimStart.toFixed(1) + "s";
+      document.getElementById("trimEndVal").textContent = trimEnd.toFixed(1) + "s";
+      document.getElementById("trimDurationBadge").textContent = "ប្រវែង៖ " + formatTime(Math.max(0, trimEnd - trimStart));
+    }
+
+    // Touch drag vertically on canvas to align the Chinese subtitle search row
+    const stageEl = document.getElementById("canvasStage");
+    stageEl.addEventListener("pointerdown", (e) => {
+      if (!video.src || !document.getElementById("coverEnabled").checked) return;
+      const rect = stageEl.getBoundingClientRect();
+      const py = ((e.clientY - rect.top) / rect.height) * 100;
+      const cy = Number(document.getElementById("coverY").value);
+      const ch = Number(document.getElementById("coverH").value);
+
+      if (Math.abs(py - cy) <= ch / 2 + 16) {
+        draggingCover = true;
+        dragOffsetY = py - cy;
+        showGuideTimer = Date.now() + 1800;
+        stageEl.setPointerCapture(e.pointerId);
+        renderCanvas();
+      }
+    });
+
+    stageEl.addEventListener("pointermove", (e) => {
+      if (!draggingCover) return;
+      const rect = stageEl.getBoundingClientRect();
+      const py = ((e.clientY - rect.top) / rect.height) * 100;
+      const ny = Math.max(10, Math.min(95, Math.round(py - dragOffsetY)));
+      document.getElementById("coverY").value = ny;
+      showGuideTimer = Date.now() + 1500;
+      syncCoverLabels();
+      syncTextWithCover();
+      renderCanvas();
+    });
+
+    stageEl.addEventListener("pointerup", () => {
+      draggingCover = false;
+      setTimeout(() => renderCanvas(), 1600);
+    });
+
+    function syncCoverLabels() {
+      document.getElementById("coverOpacityVal").textContent = document.getElementById("coverOpacity").value + "%";
+      document.getElementById("coverWVal").textContent = document.getElementById("coverW").value + "%";
+      document.getElementById("coverHVal").textContent = document.getElementById("coverH").value + "%";
+      document.getElementById("coverYVal").textContent = document.getElementById("coverY").value + "%";
+    }
+
+    function syncStyleLabels() {
+      document.getElementById("fontSizeVal").textContent = document.getElementById("fontSize").value + "px";
+      document.getElementById("textYVal").textContent = document.getElementById("textY").value + "%";
+      document.getElementById("strokeWidthVal").textContent = document.getElementById("strokeWidth").value + "px";
+      document.getElementById("shadowOpacityVal").textContent = document.getElementById("shadowOpacity").value + "%";
+      document.getElementById("shadowBlurVal").textContent = document.getElementById("shadowBlur").value + "px";
+      document.getElementById("shadowYVal").textContent = document.getElementById("shadowY").value + "px";
+      document.getElementById("shadowXVal").textContent = document.getElementById("shadowX").value + "px";
+    }
+
+    // Draw full 9:16 cover-fit video frame onto main canvas (with zoom & vertical pan)
+    function drawFullFrameVideo(targetCtx, w, h) {
+      const vw = video.videoWidth || w;
+      const vh = video.videoHeight || h;
+      const zoom = Number(document.getElementById("videoZoom").value) / 100;
+      const panY = (Number(document.getElementById("videoPanY").value) / 100) * h;
+
+      const scale = Math.max(w / vw, h / vh) * zoom;
+      const dw = vw * scale;
+      const dh = vh * scale;
+      const dx = (w - dw) / 2;
+      const dy = (h - dh) / 2 + panY;
+
+      targetCtx.drawImage(video, dx, dy, dw, dh);
+    }
+
+    // =========================================================================
+    // REAL-TIME CHINESE CHARACTER DETECTOR (Measures exact length of characters)
+    // =========================================================================
+    function detectChineseSubtitleRegion(w, h, zoneX, zoneY, zoneW, zoneH) {
+      const sampleW = 200;
+      const sampleH = Math.max(24, Math.min(64, Math.round(sampleW * (zoneH / Math.max(1, zoneW)))));
+      detectCanvas.width = sampleW;
+      detectCanvas.height = sampleH;
+
+      // Sample directly from the rendered canvas pixels in the search zone
+      detectCtx.drawImage(canvas, zoneX, zoneY, zoneW, zoneH, 0, 0, sampleW, sampleH);
+      const imgData = detectCtx.getImageData(0, 0, sampleW, sampleH).data;
+
+      const sens = Number(document.getElementById("detectSensitivity").value) / 100;
+      const edgeThresh = Math.round(56 - sens * 28); // 28 to 49
+
+      const lum = new Float32Array(sampleW * sampleH);
+      for (let i = 0, p = 0; i < imgData.length; i += 4, p++) {
+        lum[p] = 0.299 * imgData[i] + 0.587 * imgData[i + 1] + 0.114 * imgData[i + 2];
+      }
+
+      const yStart = Math.floor(sampleH * 0.12);
+      const yEnd = Math.ceil(sampleH * 0.88);
+      const colHits = new Uint16Array(sampleW);
+      const colTransitions = new Uint16Array(sampleW);
+      const colMinY = new Uint16Array(sampleW).fill(sampleH);
+      const colMaxY = new Uint16Array(sampleW).fill(0);
+
+      for (let y = yStart; y < yEnd; y++) {
+        const rowOff = y * sampleW;
+        for (let x = 2; x < sampleW - 2; x++) {
+          const idx = rowOff + x;
+          const c = lum[idx];
+          const dx = Math.abs(c - lum[idx - 1]) + Math.abs(c - lum[idx + 1]);
+          const dy = Math.abs(c - lum[idx - sampleW]) + Math.abs(c - lum[idx + sampleW]);
+          const strokeEnergy = dx + dy;
+
+          const isBrightStroke = c > 175 && strokeEnergy > edgeThresh;
+          const isDarkOutline = c < 72 && strokeEnergy > edgeThresh * 1.15;
+          const isSharpStroke = strokeEnergy > edgeThresh * 1.7;
+
+          if (isBrightStroke || isDarkOutline || isSharpStroke) {
+            colHits[x]++;
+            if (dy > edgeThresh * 0.7) colTransitions[x]++;
+            if (y < colMinY[x]) colMinY[x] = y;
+            if (y > colMaxY[x]) colMaxY[x] = y;
+          }
+        }
+      }
+
+      // Chinese characters have multiple vertical stroke crossings per column (filters out single smooth background edges)
+      const activeCols = new Uint8Array(sampleW);
+      for (let x = 2; x < sampleW - 2; x++) {
+        if (colHits[x] >= 2 && colTransitions[x] >= 1) {
+          activeCols[x] = 1;
+        }
+      }
+
+      // Bridge small inter-character spaces (up to ~6 sample cols = 1 Chinese character width)
+      const maxGap = 6;
+      let lastActive = -1;
+      for (let x = 2; x < sampleW - 2; x++) {
+        if (activeCols[x]) {
+          if (lastActive !== -1 && x - lastActive <= maxGap) {
+            for (let k = lastActive + 1; k < x; k++) activeCols[k] = 1;
+          }
+          lastActive = x;
+        }
+      }
+
+      // Extract contiguous character clusters
+      const clusters = [];
+      let cStart = -1;
+      for (let x = 2; x < sampleW - 2; x++) {
+        if (activeCols[x] && cStart === -1) {
+          cStart = x;
+        } else if (!activeCols[x] && cStart !== -1) {
+          clusters.push({ start: cStart, end: x - 1 });
+          cStart = -1;
+        }
+      }
+      if (cStart !== -1) clusters.push({ start: cStart, end: sampleW - 3 });
+
+      // Keep genuine character clusters near the center (ignore stray side artifacts)
+      const mid = sampleW / 2;
+      const valid = clusters.filter(cl => {
+        const len = cl.end - cl.start + 1;
+        const distFromMid = Math.abs((cl.start + cl.end) / 2 - mid);
+        return len >= 3 && len <= sampleW * 0.94 && distFromMid <= sampleW * 0.36;
+      });
+
+      if (!valid.length) return null;
+
+      // Pick the primary center-aligned subtitle cluster (and merge only if separated by <= 10 sample cols)
+      valid.sort((a, b) => Math.abs((a.start + a.end) / 2 - mid) - Math.abs((b.start + b.end) / 2 - mid));
+      let minCol = valid[0].start;
+      let maxCol = valid[0].end;
+
+      for (let i = 1; i < valid.length; i++) {
+        const cl = valid[i];
+        if (cl.start <= maxCol + 10 && cl.end >= minCol - 10) {
+          minCol = Math.min(minCol, cl.start);
+          maxCol = Math.max(maxCol, cl.end);
+        }
+      }
+
+      let minRow = sampleH;
+      let maxRow = 0;
+      for (let x = minCol; x <= maxCol; x++) {
+        if (colMinY[x] < minRow) minRow = colMinY[x];
+        if (colMaxY[x] > maxRow) maxRow = colMaxY[x];
+      }
+
+      if (maxCol <= minCol || maxRow <= minRow) return null;
+
+      const scaleX = zoneW / sampleW;
+      const scaleY = zoneH / sampleH;
+      const padX = Math.max(12, w * 0.018);
+      const padY = Math.max(7, h * 0.008);
+
+      const detX = Math.max(zoneX, zoneX + minCol * scaleX - padX);
+      const detRight = Math.min(zoneX + zoneW, zoneX + (maxCol + 1) * scaleX + padX);
+      const detY = Math.max(zoneY, zoneY + minRow * scaleY - padY);
+      const detBottom = Math.min(zoneY + zoneH, zoneY + (maxRow + 1) * scaleY + padY);
+
+      return {
+        x: detX,
+        y: detY,
+        w: Math.max(24, detRight - detX),
+        h: Math.max(18, detBottom - detY)
+      };
+    }
+
+    // Ultra-heavy multi-pass frosted Gaussian blur so Chinese strokes are 100% unreadable ("ព្រិលៗកុំឱ្យច្បាស់")
+    function drawHeavySmoothBlur(bx, by, bw, bh, strengthPct) {
+      if (bw <= 2 || bh <= 2) return;
+      const radius = Math.max(12, Math.round(bh * 0.32));
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, radius);
+      ctx.clip();
+
+      // Aggressive 2-stage downscale + bilinear upscale completely dissolves Chinese strokes into smooth background tone
+      const factor1 = Math.max(0.022, 0.065 - strengthPct * 0.04); // ~0.025 at 98%
+      const factor2 = Math.max(0.016, factor1 * 0.65);
+
+      blurCanvas1.width = Math.max(4, Math.round(bw * factor1));
+      blurCanvas1.height = Math.max(3, Math.round(bh * factor1));
+      blurCtx1.imageSmoothingEnabled = true;
+      blurCtx1.imageSmoothingQuality = "high";
+      blurCtx1.drawImage(canvas, bx, by, bw, bh, 0, 0, blurCanvas1.width, blurCanvas1.height);
+
+      blurCanvas2.width = Math.max(3, Math.round(bw * factor2));
+      blurCanvas2.height = Math.max(2, Math.round(bh * factor2));
+      blurCtx2.imageSmoothingEnabled = true;
+      blurCtx2.imageSmoothingQuality = "high";
+      blurCtx2.drawImage(blurCanvas1, 0, 0, blurCanvas1.width, blurCanvas1.height, 0, 0, blurCanvas2.width, blurCanvas2.height);
+
+      if ("filter" in ctx) {
+        ctx.filter = `blur(${Math.round(10 + strengthPct * 14)}px)`;
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const bleed = 12;
+      ctx.drawImage(blurCanvas2, 0, 0, blurCanvas2.width, blurCanvas2.height, bx - bleed, by - bleed, bw + bleed * 2, bh + bleed * 2);
+      ctx.filter = "none";
+
+      // Soft frosted overlay so Khmer subtitle text on top pops clearly
+      ctx.fillStyle = `rgba(15, 23, 42, ${(0.24 * strengthPct).toFixed(2)})`;
+      ctx.fillRect(bx, by, bw, bh);
+
+      ctx.restore();
+    }
+
+    // SRT Parsing & Rendering
+    function parseSrtTime(str) {
+      const m = str.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+      if (!m) return 0;
+      return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000;
+    }
+
+    function parseSrtContent(raw) {
+      const blocks = raw.replace(/\r/g, "").trim().split(/\n\s*\n/);
+      const list = [];
+      for (const b of blocks) {
+        const lines = b.split("\n").map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) continue;
+        const timeLineIdx = lines.findIndex(l => l.includes("-->"));
+        if (timeLineIdx === -1) continue;
+        const [startStr, endStr] = lines[timeLineIdx].split("-->");
+        const text = lines.slice(timeLineIdx + 1).join("\n");
+        list.push({
+          start: parseSrtTime(startStr),
+          end: parseSrtTime(endStr),
+          text
+        });
+      }
+      return list;
+    }
+
+    async function handleSrtFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      subtitles = parseSrtContent(text);
+      document.getElementById("autoSubStatusBadge").textContent = `✅ ${subtitles.length} ឃ្លា (.SRT)`;
+      renderSrtList();
+      renderCanvas();
+      showToast(`📝 បានបញ្ចូលអក្សរខ្មែរជំនួយ ${subtitles.length} ឃ្លា`);
+      if (video.src) analyzeVideoForStoryTitle(false);
+    }
+
+    document.getElementById("srtInput").addEventListener("change", handleSrtFileSelect);
+    document.getElementById("srtInputTop").addEventListener("change", handleSrtFileSelect);
+
+    async function fetchLatestSrtFromBackend() {
+      const backendUrl = document.getElementById("backendUrlInput").value.trim().replace(/\/$/, "");
+      if (!backendUrl) return showToast("⚠️ សូមបញ្ចូលតំណភ្ជាប់ Server");
+      showToast("☁️ កំពុងទាញអក្សររត់ពី Server...");
+      try {
+        const res = await fetch(`${backendUrl}/api/jobs`);
+        const data = await res.json();
+        const jobs = data.jobs || [];
+        const withSegments = jobs.filter(j => Array.isArray(j.segments) && j.segments.length > 0);
+        if (!withSegments.length) {
+          return showToast("⚠️ មិនទាន់មានទិន្នន័យបកប្រែលើ Server ទេ");
+        }
+        const latest = withSegments.find(j => currentVideoName && j.originalName && currentVideoName.includes(j.originalName.replace(/\.[^/.]+$/, ""))) || withSegments[0];
+        subtitles = latest.segments.map(s => ({
+          start: Number(s.start) || 0,
+          end: Number(s.end) || 0,
+          text: String(s.text || "")
+        }));
+        if (latest.videoTitle) {
+          document.getElementById("mainStoryTitle").value = latest.videoTitle;
+        }
+        document.getElementById("autoSubStatusBadge").textContent = `✅ ${subtitles.length} ឃ្លា (Server)`;
+        renderSrtList();
+        renderCanvas();
+        showToast(`✅ ទាញបាន ${subtitles.length} ឃ្លាពី Server!`);
+        analyzeVideoForStoryTitle(false);
+      } catch (err) {
+        showToast("⚠️ មិនអាចភ្ជាប់ទៅ Server បានទេ");
+      }
+    }
+
+    function encodeAudioSliceToWavBase64(audioBuffer, startSec, endSec) {
+      const srcRate = audioBuffer.sampleRate;
+      const targetRate = 8000;
+      const ratio = srcRate / targetRate;
+      const startSample = Math.max(0, Math.floor(startSec * srcRate));
+      const endSample = Math.min(audioBuffer.length, Math.floor(endSec * srcRate));
+      const srcLen = Math.max(0, endSample - startSample);
+      const outLen = Math.floor(srcLen / ratio);
+
+      const numChannels = audioBuffer.numberOfChannels;
+      const ch0 = audioBuffer.getChannelData(0);
+      const ch1 = numChannels > 1 ? audioBuffer.getChannelData(1) : null;
+
+      const wavBuffer = new ArrayBuffer(44 + outLen * 2);
+      const view = new DataView(wavBuffer);
+
+      function writeStr(offset, str) {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      }
+
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + outLen * 2, true);
+      writeStr(8, "WAVE");
+      writeStr(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, targetRate, true);
+      view.setUint32(28, targetRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, outLen * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < outLen; i++) {
+        const idx = startSample + Math.floor(i * ratio);
+        let sample = ch0[idx] || 0;
+        if (ch1) sample = (sample + (ch1[idx] || 0)) * 0.5;
+        sample = Math.max(-1, Math.min(1, sample));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+
+      const bytes = new Uint8Array(wavBuffer);
+      let binary = "";
+      const chunkStep = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkStep) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkStep));
+      }
+      return btoa(binary);
+    }
+
+    async function autoGenerateKhmerSubtitles(manualTrigger) {
+      if (!video.src || !currentVideoFile) {
+        if (manualTrigger) showToast("⚠️ សូមជ្រើសរើសវីដេអូជាមុនសិន");
+        return;
+      }
+      if (isGeneratingSubs) return;
+
+      const statusBadge = document.getElementById("autoSubStatusBadge");
+      const progWrap = document.getElementById("autoSubProgressWrap");
+      const progBar = document.getElementById("autoSubProgressBar");
+      const progText = document.getElementById("autoSubProgressText");
+
+      const backendUrl = document.getElementById("backendUrlInput").value.trim().replace(/\/$/, "");
+      if (backendUrl && !manualTrigger) {
+        try {
+          statusBadge.textContent = "⏳ កំពុងពិនិត្យ Server...";
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 3500);
+          const res = await fetch(`${backendUrl}/api/jobs`, { signal: controller.signal });
+          const data = await res.json();
+          const jobs = (data.jobs || []).filter(j => j.status === "completed" && Array.isArray(j.segments) && j.segments.length > 0);
+          const exactMatch = jobs.find(j => currentVideoName && j.originalName && currentVideoName.includes(j.originalName.replace(/\.[^/.]+$/, "")));
+          if (exactMatch) {
+            subtitles = exactMatch.segments.map(s => ({
+              start: Number(s.start) || 0,
+              end: Number(s.end) || 0,
+              text: String(s.text || "")
+            }));
+            statusBadge.textContent = `✅ រួចរាល់ (${subtitles.length} ឃ្លា)`;
+            renderSrtList();
+            renderCanvas();
+            showToast(`✅ បានដាក់អក្សរខ្មែរជំនួយ ${subtitles.length} ឃ្លាដោយស្វ័យប្រវត្តិ!`);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      const apiKey = document.getElementById("geminiApiKeyInput").value.trim();
+      if (!apiKey) {
+        statusBadge.textContent = "🔑 ត្រូវការ API Key";
+        document.getElementById("quickKeyPrompt").style.display = "block";
+        if (manualTrigger) {
+          showToast("🔑 សូមបិទភ្ជាប់ Gemini API Key ខាងលើ ដើម្បីបកប្រែអក្សររត់ស្វ័យប្រវត្តិ");
+        }
+        return;
+      }
+
+      isGeneratingSubs = true;
+      progWrap.style.display = "block";
+      progBar.style.width = "5%";
+      statusBadge.textContent = "⏳ កំពុងបង្កើតអក្សរខ្មែរ...";
+      progText.textContent = "កំពុងទាញយកសំឡេងចេញពីវីដេអូលើទូរស័ព្ទ...";
+
+      try {
+        const arrayBuf = await currentVideoFile.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+        const totalDur = audioBuffer.duration;
+        const chunkLen = 90;
+        const numChunks = Math.ceil(totalDur / chunkLen);
+        subtitles = [];
+
+        for (let c = 0; c < numChunks; c++) {
+          const cStart = c * chunkLen;
+          const cEnd = Math.min(totalDur, (c + 1) * chunkLen);
+          const pct = Math.round(((c + 0.3) / numChunks) * 100);
+          progBar.style.width = pct + "%";
+          progText.textContent = `កំពុងស្តាប់ និងបកប្រែអក្សរខ្មែរ កំណាត់ទី ${c + 1}/${numChunks} (${formatTime(cStart)} - ${formatTime(cEnd)})...`;
+
+          const wavBase64 = encodeAudioSliceToWavBase64(audioBuffer, cStart, cEnd);
+          const prompt = `ស្តាប់សំឡេងនិយាយក្នុងឯកសារអូឌីយ៉ូនេះ (ប្រវែង ${(cEnd - cStart).toFixed(1)} វិនាទី) រួចបកប្រែការសន្ទនាទាំងអស់ទៅជាអក្សររត់ភាសាខ្មែរធម្មជាតិ ងាយយល់ និងត្រឹមត្រូវតាមម៉ោងនិយាយ។
+សូមឆ្លើយតបជា JSON Array តែប៉ុណ្ណោះ តាមទម្រង់នេះ៖
+[
+  {"start": 0.5, "end": 3.2, "text": "ឃ្លាភាសាខ្មែរទី ១"},
+  {"start": 3.4, "end": 6.8, "text": "ឃ្លាភាសាខ្មែរទី ២"}
+]
+ចំណាំ៖ start និង end គិតជាវិនាទីចាប់ពី 0.0 ដល់ ${(cEnd - cStart).toFixed(1)}។ បើគ្មានការនិយាយទេ សូមឆ្លើយ []។`;
+
+          const result = await callGeminiWithFallback(apiKey, {
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: "audio/wav", data: wavBase64 } }
+              ]
+            }],
+            generationConfig: { responseMimeType: "application/json" }
+          }, (msg) => {
+            progText.textContent = msg;
+          });
+
+          const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+          const segs = JSON.parse(rawText);
+          if (Array.isArray(segs)) {
+            segs.forEach(s => {
+              const st = Number(s.start);
+              const en = Number(s.end);
+              const tx = String(s.text || "").trim();
+              if (tx && Number.isFinite(st) && Number.isFinite(en) && en > st) {
+                subtitles.push({
+                  start: Number((cStart + st).toFixed(2)),
+                  end: Number((cStart + en).toFixed(2)),
+                  text: tx
+                });
+              }
+            });
+            subtitles.sort((a, b) => a.start - b.start);
+            renderSrtList();
+            renderCanvas();
+          }
+        }
+
+        progBar.style.width = "100%";
+        progText.textContent = `✅ បង្កើតអក្សរខ្មែររត់រួចរាល់សរុប ${subtitles.length} ឃ្លា!`;
+        statusBadge.textContent = `✅ រួចរាល់ (${subtitles.length} ឃ្លា)`;
+        showToast(`🎉 បានដាក់អក្សរខ្មែរជំនួយ ${subtitles.length} ឃ្លាក្នុងវីដេអូរួចរាល់!`);
+        analyzeVideoForStoryTitle(false);
+      } catch (err) {
+        statusBadge.textContent = "⚠️ មានបញ្ហា";
+        progText.textContent = "❌ មិនអាចបង្កើតអក្សររត់បាន៖ " + err.message;
+        showToast("⚠️ " + err.message);
+      } finally {
+        isGeneratingSubs = false;
+      }
+    }
+
+    function renderSrtList() {
+      const container = document.getElementById("srtListContainer");
+      document.getElementById("srtCountBadge").textContent = `${subtitles.length} ឃ្លា`;
+      if (!subtitles.length) {
+        container.innerHTML = `<p class="hint">មិនទាន់មានអក្សររត់ខ្មែរនៅឡើយទេ។</p>`;
+        return;
+      }
+      container.innerHTML = subtitles.map((s, idx) => `
+        <div class="srt-item" id="srt-item-${idx}">
+          <div class="srt-meta">
+            <span>#${idx + 1} • ${formatTime(s.start)} → ${formatTime(s.end)}</span>
+            <button type="button" class="small" onclick="jumpToSrt(${idx})">👁️ មើល</button>
+          </div>
+          <textarea rows="2" oninput="subtitles[${idx}].text = this.value; renderCanvas();">${escapeHtml(s.text)}</textarea>
+        </div>
+      `).join("");
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function jumpToSrt(idx) {
+      if (!video.src || !subtitles[idx]) return;
+      video.currentTime = subtitles[idx].start + 0.05;
+    }
+
+    function addNewSubtitleLine() {
+      const start = video.src ? Number(video.currentTime.toFixed(1)) : 0;
+      const end = Number((start + 2.5).toFixed(1));
+      subtitles.push({ start, end, text: "សរសេរអក្សរខ្មែរនៅទីនេះ..." });
+      subtitles.sort((a, b) => a.start - b.start);
+      renderSrtList();
+      renderCanvas();
+    }
+
+    function highlightActiveSrt() {
+      const t = video.currentTime;
+      subtitles.forEach((s, idx) => {
+        const el = document.getElementById(`srt-item-${idx}`);
+        if (!el) return;
+        if (t >= s.start && t <= s.end) el.classList.add("current");
+        else el.classList.remove("current");
+      });
+    }
+
+    // Automatic Story Title Generator on Video Upload (displays in upper corner inside video)
+    async function extractSampleFramesBase64() {
+      if (!video.src || !video.duration) return [];
+      const points = [0.12, 0.32, 0.52, 0.72, 0.88];
+      const frames = [];
+      const prevTime = video.currentTime;
+      const tmpC = document.createElement("canvas");
+      tmpC.width = 360;
+      tmpC.height = Math.round(360 * ((video.videoHeight || 1280) / (video.videoWidth || 720)));
+      const tCtx = tmpC.getContext("2d");
+
+      for (const p of points) {
+        await new Promise((resolve) => {
+          const onSeek = () => {
+            video.removeEventListener("seeked", onSeek);
+            tCtx.drawImage(video, 0, 0, tmpC.width, tmpC.height);
+            const dataUrl = tmpC.toDataURL("image/jpeg", 0.65);
+            frames.push(dataUrl.split(",")[1]);
+            resolve();
+          };
+          video.addEventListener("seeked", onSeek);
+          video.currentTime = Math.min(video.duration - 0.1, video.duration * p);
+        });
+      }
+      video.currentTime = prevTime;
+      return frames;
+    }
+
+    async function analyzeVideoForStoryTitle(forceNotify) {
+      const badge = document.getElementById("titleStatusBadge");
+      badge.textContent = "⏳ កំពុងវិភាគសាច់រឿង...";
+
+      const apiKey = document.getElementById("geminiApiKeyInput").value.trim();
+      if (apiKey && video.src) {
+        try {
+          const frames = await extractSampleFramesBase64();
+          const dialogueSample = subtitles.slice(0, 30).map(s => s.text).join(" | ");
+          const prompt = `អ្នកជាអ្នកនិពន្ធចំណងជើងរឿងភាគ និងភាពយន្តខ្មែរដ៏ពូកែ។ សូមមើលរូបភាពទាំង ៥ ប្លង់ពីវីដេអូនេះ ${dialogueSample ? `និងអត្ថបទសន្ទនា៖ "${dialogueSample}"` : ""} រួចបង្កើតចំណងជើងរឿងជាភាសាខ្មែរដែលទាក់ទាញខ្លាំង។
+សូមឆ្លើយតបជា JSON តែប៉ុណ្ណោះតាមទម្រង់នេះ៖
+{
+  "mainTitle": "ចំណងជើងសាច់រឿងគោលខ្លីច្បាស់",
+  "dramaTitle": "ចំណងជើងបែបមនោសញ្ចេតនា ឬរឿងភាគ",
+  "mysteryTitle": "ចំណងជើងបែបអាថ៌កំបាំង ឬរន្ធត់ទាក់ទាញ",
+  "shortHook": "ចំណងជើងខ្លីៗ ១ ឃ្លាសម្រាប់ TikTok/Reels",
+  "synopsis": "សង្ខេបសាច់រឿង ២ ប្រយោគជាភាសាខ្មែរ"
+}`;
+
+          const parts = [{ text: prompt }];
+          frames.forEach(b64 => parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }));
+
+          const result = await callGeminiWithFallback(apiKey, {
+            contents: [{ parts }],
+            generationConfig: { responseMimeType: "application/json" }
+          });
+
+          const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const parsed = JSON.parse(rawText);
+          applyGeneratedTitles(parsed);
+          badge.textContent = "✅ វិភាគរួចរាល់ (AI)";
+          if (forceNotify) showToast("✨ បានបង្កើតចំណងជើងរឿងថ្មីរួចរាល់!");
+          return;
+        } catch (err) {
+          console.warn("Gemini direct fallback:", err);
+        }
+      }
+
+      const smartTitles = buildSmartKhmerTitles("");
+      applyGeneratedTitles(smartTitles);
+      badge.textContent = "✅ រួចរាល់";
+      if (forceNotify) showToast("✨ បានបង្កើតចំណងជើងរឿងរួចរាល់!");
+    }
+
+    function buildSmartKhmerTitles(serverTitle) {
+      const allText = subtitles.map(s => s.text).join(" ");
+      let baseTopic = serverTitle || "";
+
+      if (!baseTopic && allText.length > 5) {
+        const cleanLines = subtitles.map(s => s.text.replace(/[.!?។៕]+/g, "").trim()).filter(t => t.length >= 6 && t.length <= 42);
+        baseTopic = cleanLines[0] || subtitles[0].text.slice(0, 38);
+      }
+
+      if (!baseTopic) {
+        baseTopic = `រឿងភាគពិសេស៖ ការពិតដែលមិននឹកស្មានដល់`;
+      }
+
+      const hasLove = /ស្រឡាញ់|បេះដូង|ប្រពន្ធ|ប្តី|រៀបការ|ស្នេហា|នឹក/.test(allText);
+      const hasFight = /សម្លាប់|សងសឹក|ក្បត់|អំណាច|ស្តេច|មេទ័ព|គុន|ដាវ/.test(allText);
+      const hasSecret = /ការពិត|លាក់|អាថ៌កំបាំង|ភ្ញាក់ផ្អើល|ស្មានមិនដល់|ក្លែង/.test(allText);
+
+      let drama = `វាសនាស្នេហ៍អភ័ព្វ៖ ${baseTopic}`;
+      let mystery = `ការពិតនៅពីក្រោយ៖ ${baseTopic}`;
+      let hook = `🔥 ឈុតពិសេស៖ ${baseTopic}`;
+
+      if (hasFight) {
+        drama = `កំពូលអ្នកក្លាហាន៖ ${baseTopic}`;
+        mystery = `គំនុំសងសឹកឈាម៖ ${baseTopic}`;
+        hook = `⚔️ ឈុតប្រយុទ្ធ៖ ${baseTopic}`;
+      } else if (hasLove) {
+        drama = `និស្ស័យស្នេហ៍កម្ម៖ ${baseTopic}`;
+        mystery = `ទឹកភ្នែក និងការលះបង់៖ ${baseTopic}`;
+        hook = `💔 ឈុតមនោសញ្ចេតនា៖ ${baseTopic}`;
+      } else if (hasSecret) {
+        drama = `ជីវិតពិត និងការតស៊ូ៖ ${baseTopic}`;
+        mystery = `អាថ៌កំបាំងលាតត្រដាង៖ ${baseTopic}`;
+        hook = `😱 ស្មានមិនដល់សោះ៖ ${baseTopic}`;
+      }
+
+      const synopsis = allText
+        ? `សាច់រឿងនិយាយអំពី ${allText.slice(0, 120)}... ដែលនាំមកនូវភាពជក់ចិត្ត និងអារម្មណ៍រំភើបគ្រប់វិនាទី។`
+        : `វីដេអូរឿងភាគសម្រិតសម្រាំងប្រវែង ${formatTime(video.duration)} ដែលបង្ហាញពីដំណើរសាច់រឿងដ៏គួរឱ្យចាប់អារម្មណ៍។`;
+
+      return {
+        mainTitle: baseTopic,
+        dramaTitle: drama,
+        mysteryTitle: mystery,
+        shortHook: hook,
+        synopsis
+      };
+    }
+
+    function applyGeneratedTitles(obj) {
+      document.getElementById("mainStoryTitle").value = obj.mainTitle || "";
+      document.getElementById("dramaTitleText").textContent = obj.dramaTitle || "";
+      document.getElementById("mysteryTitleText").textContent = obj.mysteryTitle || "";
+      document.getElementById("shortHookText").textContent = obj.shortHook || "";
+      document.getElementById("storySynopsisText").textContent = obj.synopsis || "";
+      document.getElementById("titleVariantsArea").style.display = "block";
+      document.getElementById("showTopTitleToggle").checked = true;
+      renderCanvas();
+    }
+
+    function useVariantTitle(elId) {
+      const txt = document.getElementById(elId).textContent.trim();
+      document.getElementById("mainStoryTitle").value = txt;
+      document.getElementById("showTopTitleToggle").checked = true;
+      renderCanvas();
+      showToast("🏷️ បានដាក់ចំណងជើងនេះក្នុងវីដេអូ");
+    }
+
+    function copyTextValue(inputId) {
+      const val = document.getElementById(inputId).value;
+      navigator.clipboard?.writeText(val);
+      showToast("📋 បានចម្លងចំណងជើងទុករួចរាល់!");
+    }
+
+    function copyElementText(elId) {
+      const val = document.getElementById(elId).textContent;
+      navigator.clipboard?.writeText(val);
+      showToast("📋 បានចម្លងអត្ថបទទុករួចរាល់!");
+    }
+
+    // Canvas Rendering (Full 9:16 Video + Auto-Detected Character Blur + Upper-Corner Story Title + Shadowed Khmer Subtitles)
+    function hexToRgba(hex, alpha) {
+      const clean = hex.replace("#", "");
+      const r = parseInt(clean.substring(0, 2), 16) || 0;
+      const g = parseInt(clean.substring(2, 4), 16) || 0;
+      const b = parseInt(clean.substring(4, 6), 16) || 0;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function wrapKhmerText(context, text, maxWidth) {
+      const rawLines = text.split("\n");
+      const finalLines = [];
+      for (const line of rawLines) {
+        if (context.measureText(line).width <= maxWidth) {
+          finalLines.push(line);
+          continue;
+        }
+        const tokens = line.includes(" ") ? line.split(" ") : Array.from(line);
+        const joiner = line.includes(" ") ? " " : "";
+        let current = "";
+        for (const tok of tokens) {
+          const test = current ? current + joiner + tok : tok;
+          if (context.measureText(test).width > maxWidth && current) {
+            finalLines.push(current);
+            current = tok;
+          } else {
+            current = test;
+          }
+        }
+        if (current) finalLines.push(current);
+      }
+      return finalLines;
+    }
+
+    function renderCanvas() {
+      const w = canvas.width || 720;
+      const h = canvas.height || 1280;
+      ctx.clearRect(0, 0, w, h);
+
+      if (video.src && video.readyState >= 2) {
+        drawFullFrameVideo(ctx, w, h);
+      } else {
+        ctx.fillStyle = "#090f1e";
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // 1. Original Chinese Text Auto-Detect & Heavy Dynamic Blur (strictly matching character length)
+      if (document.getElementById("coverEnabled").checked && video.src && video.readyState >= 2) {
+        const mode = document.getElementById("coverMode").value;
+        const opacity = Number(document.getElementById("coverOpacity").value) / 100;
+        const zoneW = (Number(document.getElementById("coverW").value) / 100) * w;
+        const zoneH = (Number(document.getElementById("coverH").value) / 100) * h;
+        const centerX = (Number(document.getElementById("coverX").value) / 100) * w;
+        const centerY = (Number(document.getElementById("coverY").value) / 100) * h;
+        const zoneX = Math.max(0, centerX - zoneW / 2);
+        const zoneY = Math.max(0, centerY - zoneH / 2);
+
+        const chip = document.getElementById("autoDetectChip");
+
+        if (mode === "auto_blur") {
+          const detected = detectChineseSubtitleRegion(w, h, zoneX, zoneY, zoneW, zoneH);
+          if (detected) {
+            if (!trackedBox.active || trackedBox.alpha < 0.2) {
+              trackedBox = { active: true, alpha: 1.0, x: detected.x, y: detected.y, w: detected.w, h: detected.h };
+            } else {
+              const newLeft = Math.min(detected.x, trackedBox.x * 0.4 + detected.x * 0.6);
+              const newRight = Math.max(detected.x + detected.w, (trackedBox.x + trackedBox.w) * 0.4 + (detected.x + detected.w) * 0.6);
+              trackedBox.x = newLeft;
+              trackedBox.w = newRight - newLeft;
+              trackedBox.y = trackedBox.y * 0.45 + detected.y * 0.55;
+              trackedBox.h = Math.max(detected.h, trackedBox.h * 0.6 + detected.h * 0.4);
+              trackedBox.alpha = 1.0;
+              trackedBox.active = true;
+            }
+            if (chip) {
+              chip.textContent = "🔍 ចាប់បានអក្សរចិន (ព្រិលអូតូ)";
+              chip.style.borderColor = "rgba(34, 197, 94, 0.65)";
+              chip.style.color = "#bbf7d0";
+            }
+          } else {
+            trackedBox.alpha = Math.max(0, trackedBox.alpha - 0.28);
+            if (trackedBox.alpha === 0) trackedBox.active = false;
+            if (chip) {
+              chip.textContent = "🔍 រង់ចាំតួអក្សរចិនលោតមក...";
+              chip.style.borderColor = "rgba(56, 189, 248, 0.45)";
+              chip.style.color = "#e0f2fe";
+            }
+          }
+
+          if (trackedBox.active && trackedBox.alpha > 0.05) {
+            drawHeavySmoothBlur(trackedBox.x, trackedBox.y, trackedBox.w, trackedBox.h, opacity * trackedBox.alpha);
+          }
+
+          if (!isExporting && (draggingCover || Date.now() < showGuideTimer)) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
+            ctx.lineWidth = Math.max(2, w / 360);
+            ctx.setLineDash([8, 6]);
+            ctx.strokeRect(zoneX, zoneY, zoneW, zoneH);
+            ctx.restore();
+          }
+        } else if (mode === "blur") {
+          drawHeavySmoothBlur(zoneX, zoneY, zoneW, zoneH, opacity);
+          if (chip) chip.textContent = "🛡️ ព្រិលប្រអប់ទំហំថេរ";
+        } else {
+          ctx.save();
+          ctx.fillStyle = hexToRgba("#000000", opacity);
+          ctx.beginPath();
+          ctx.roundRect(zoneX, zoneY, zoneW, zoneH, 10);
+          ctx.fill();
+          ctx.restore();
+          if (chip) chip.textContent = "🛡️ បិទបាំងពណ៌រាប";
+        }
+      }
+
+      // 2. Story Title Inside Video at Upper Corner ("ចំណងជើងរឿងដាក់ក្នុងវីដេអូ នៅជ្រុងខាងលើ")
+      if (document.getElementById("showTopTitleToggle").checked) {
+        const titleTxt = document.getElementById("mainStoryTitle").value.trim();
+        if (titleTxt) {
+          ctx.save();
+          const scaleFactor = w / 720;
+          const tSize = Math.round(23 * scaleFactor);
+          ctx.font = `700 ${tSize}px 'Kantumruy Pro', 'Koulen', 'Noto Sans Khmer', sans-serif`;
+          const pos = document.getElementById("topTitlePos").value;
+          const maxBoxW = w * 0.78;
+          const lines = wrapKhmerText(ctx, titleTxt, maxBoxW - 28 * scaleFactor).slice(0, 2);
+
+          let maxLineW = 0;
+          lines.forEach(l => {
+            const mw = ctx.measureText(l).width;
+            if (mw > maxLineW) maxLineW = mw;
+          });
+
+          const padX = 16 * scaleFactor;
+          const padY = 10 * scaleFactor;
+          const lineH = tSize * 1.32;
+          const boxW = Math.min(maxBoxW, maxLineW + padX * 2);
+          const boxH = lines.length * lineH + padY * 1.6;
+          const marginSide = w * 0.04;
+          const marginTop = h * 0.038;
+
+          let boxX = marginSide;
+          if (pos === "top-center") boxX = (w - boxW) / 2;
+          else if (pos === "top-right") boxX = w - boxW - marginSide;
+
+          // Sleek dark translucent badge inside upper corner of the video
+          ctx.fillStyle = "rgba(8, 13, 26, 0.72)";
+          ctx.beginPath();
+          ctx.roundRect(boxX, marginTop, boxW, boxH, 12 * scaleFactor);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(250, 204, 21, 0.65)";
+          ctx.lineWidth = 2 * scaleFactor;
+          ctx.stroke();
+
+          ctx.fillStyle = "#fde047";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 4;
+          ctx.textBaseline = "middle";
+
+          if (pos === "top-center") {
+            ctx.textAlign = "center";
+            lines.forEach((l, i) => {
+              ctx.fillText(l, boxX + boxW / 2, marginTop + padY * 0.8 + lineH * (i + 0.5));
+            });
+          } else if (pos === "top-right") {
+            ctx.textAlign = "right";
+            lines.forEach((l, i) => {
+              ctx.fillText(l, boxX + boxW - padX, marginTop + padY * 0.8 + lineH * (i + 0.5));
+            });
+          } else {
+            ctx.textAlign = "left";
+            lines.forEach((l, i) => {
+              ctx.fillText(l, boxX + padX, marginTop + padY * 0.8 + lineH * (i + 0.5));
+            });
+          }
+          ctx.restore();
+        }
+      }
+
+      // 3. Active Khmer Running Subtitle ("អក្សរខ្មែរជំនួយ") with Outline & Drop Shadow
+      const curTime = video.currentTime || 0;
+      const activeSub = subtitles.find(s => curTime >= s.start && curTime <= s.end);
+      const displayText = activeSub ? activeSub.text : (!video.src ? "ឧទាហរណ៍អក្សរខ្មែរជំនួយមានស្រមោលច្បាស់ស្អាត" : "");
+
+      if (displayText) {
+        const scaleFactor = w / 720;
+        const fontSize = Math.round(Number(document.getElementById("fontSize").value) * scaleFactor);
+        const fontFamily = document.getElementById("fontFamily").value;
+        const textColor = document.getElementById("textColor").value;
+        const textY = (Number(document.getElementById("textY").value) / 100) * h;
+
+        const strokeColor = document.getElementById("strokeColor").value;
+        const strokeWidth = Math.round(Number(document.getElementById("strokeWidth").value) * scaleFactor);
+
+        const shadowColor = document.getElementById("shadowColor").value;
+        const shadowOpacity = Number(document.getElementById("shadowOpacity").value) / 100;
+        const shadowBlur = Math.round(Number(document.getElementById("shadowBlur").value) * scaleFactor);
+        const shadowX = Math.round(Number(document.getElementById("shadowX").value) * scaleFactor);
+        const shadowY = Math.round(Number(document.getElementById("shadowY").value) * scaleFactor);
+
+        ctx.save();
+        ctx.font = `700 ${fontSize}px ${fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+
+        const lines = wrapKhmerText(ctx, displayText, w * 0.88);
+        const lineHeight = fontSize * 1.35;
+        const totalHeight = lines.length * lineHeight;
+        let startY = textY - totalHeight / 2 + lineHeight / 2;
+
+        lines.forEach((line) => {
+          if (shadowOpacity > 0) {
+            ctx.save();
+            ctx.shadowColor = hexToRgba(shadowColor, shadowOpacity);
+            ctx.shadowBlur = shadowBlur;
+            ctx.shadowOffsetX = shadowX;
+            ctx.shadowOffsetY = shadowY;
+            ctx.fillStyle = hexToRgba(shadowColor, shadowOpacity);
+            ctx.fillText(line, w / 2, startY);
+            ctx.restore();
+          }
+
+          if (strokeWidth > 0) {
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = strokeWidth;
+            ctx.strokeText(line, w / 2, startY);
+          }
+
+          ctx.fillStyle = textColor;
+          ctx.fillText(line, w / 2, startY);
+          startY += lineHeight;
+        });
+
+        ctx.restore();
+      }
+    }
+
+    // Export Full 9:16 Video + Auto-Blurred Chinese Text + Upper-Corner Story Title + Shadowed Khmer Subtitles + Audio
+    async function startVideoExport() {
+      if (!video.src) return showToast("⚠️ សូមបញ្ចូលវីដេអូជាមុនសិន!");
+      if (isExporting) return;
+
+      isExporting = true;
+      trackedBox = { active: false, alpha: 0, x: 0, y: 0, w: 0, h: 0 };
+      const exportBtn = document.getElementById("exportBtn");
+      exportBtn.disabled = true;
+      document.getElementById("exportProgressArea").style.display = "block";
+      document.getElementById("exportDownloadArea").style.display = "none";
+
+      try {
+        video.pause();
+        video.currentTime = trimStart;
+        await new Promise(r => { video.onseeked = r; });
+
+        const stream = canvas.captureStream(30);
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const sourceNode = audioCtx.createMediaElementSource(video);
+          const destNode = audioCtx.createMediaStreamDestination();
+          sourceNode.connect(destNode);
+          sourceNode.connect(audioCtx.destination);
+          destNode.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+        } catch (audioErr) {
+          console.warn("Audio capture fallback:", audioErr);
+        }
+
+        const mimeTypes = [
+          "video/mp4;codecs=avc1,mp4a.40.2",
+          "video/mp4",
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm"
+        ];
+        const chosenMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || "";
+        const recorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime, videoBitsPerSecond: 3500000 }) : new MediaRecorder(stream);
+        const chunks = [];
+
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+        };
+
+        const totalClip = Math.max(0.5, trimEnd - trimStart);
+
+        const donePromise = new Promise((resolve) => {
+          recorder.onstop = () => resolve();
+        });
+
+        recorder.start(250);
+        await video.play();
+
+        const monitor = setInterval(() => {
+          renderCanvas();
+          const elapsed = Math.max(0, video.currentTime - trimStart);
+          const pct = Math.min(99, Math.round((elapsed / totalClip) * 100));
+          document.getElementById("exportProgressBar").style.width = pct + "%";
+          document.getElementById("exportPercentText").textContent = pct + "%";
+          document.getElementById("exportStatusText").textContent = "កំពុងថតវីដេអូ 9:16 ពេញ ព្រិលអក្សរចិនអូតូ និងអក្សរខ្មែរ...";
+
+          if (video.currentTime >= trimEnd || video.ended) {
+            clearInterval(monitor);
+            video.pause();
+            if (recorder.state !== "inactive") recorder.stop();
+          }
+        }, 33);
+
+        await donePromise;
+
+        const isMp4 = chosenMime.includes("mp4");
+        const blob = new Blob(chunks, { type: chosenMime || "video/webm" });
+        const outUrl = URL.createObjectURL(blob);
+        const ext = isMp4 ? "mp4" : "webm";
+        const cleanTitle = (document.getElementById("mainStoryTitle").value.trim() || currentVideoName || "khmer-video-9x16").replace(/[\\/:*?"<>|]/g, "_").slice(0, 45);
+        const fileName = `${cleanTitle}.${ext}`;
+
+        document.getElementById("exportProgressBar").style.width = "100%";
+        document.getElementById("exportPercentText").textContent = "100%";
+        document.getElementById("exportStatusText").textContent = "✅ ផលិតវីដេអូ 9:16 ពេញរួចរាល់ 100%!";
+
+        const link = document.getElementById("downloadFinalLink");
+        link.href = outUrl;
+        link.download = fileName;
+        document.getElementById("exportDownloadArea").style.display = "block";
+        link.click();
+        showToast("🎉 ផលិតវីដេអូរួចរាល់ និងកំពុងទាញយកចូលទូរស័ព្ទ!");
+      } catch (err) {
+        showToast("❌ មានបញ្ហាពេលផលិតវីដេអូ៖ " + err.message);
+      } finally {
+        isExporting = false;
+        exportBtn.disabled = false;
+        renderCanvas();
+      }
+    }
+  </script>
+</body>
+</html>
